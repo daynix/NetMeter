@@ -20,6 +20,59 @@ from subprocess import Popen
 from os import makedirs
 from os.path import isdir, join
 
+##############################
+##### Parameters to edit #####
+
+# Export directory. The results will be saved there. [str]
+# Example: '/home/daynix/out'
+export_dir = 'out'
+
+# IP of the guest. [str]
+# Example: '10.0.1.114'
+remote_addr = '10.0.1.114'
+
+# IP of the host, which the guest can connect to. [str]
+# Example: '10.0.0.157'
+local_addr = '10.0.0.157'
+
+# Path to the Iperf executable on the guest. [str]
+# Example: 'C:\iperf\iperf.exe'
+remote_iperf = 'C:\iperf\iperf.exe'
+
+# Path to the Iperf executable on the host (local). [str]
+# Example: 'iperf'
+local_iperf = 'iperf'
+
+# Path to the gnuplot executable on the host (local). [str]
+# Example: 'gnuplot'
+gnuplot_bin = 'gnuplot'
+
+# A list of packet sizes to test (preferably as powers of 2). [iterable]
+# Example: [2**x for x in range(5,17)]  (For sizes of 32B to 64KB)
+test_range = [2**x for x in range(5,17)]
+
+# The duration of a single run, in seconds. Must be at least 20, preferable at least 120. [int]
+# Example: 300
+run_duration = 300
+
+# The desired number of streams. [int]
+# Example: 1
+streams = 4
+
+# A path to the credentials file for Windows access, which consists of three lines: [str]
+#    username=<USERNAME>  (You probably want to use the username Administrator)
+#    password=<PASSWORD>
+#    domain=<DOMAIN>  (You probably want to use the domain WORKGROUP)
+# Example: 'creds.dat'
+creds = 'creds.dat'
+
+# A title for the test. Needs to be short and informative, appears as the title of the output html page.
+# For the page to look good, the title needs to be no longer than 80 characters. [str]
+# Example: 'Some Informative Title'
+title = 'Test Results (5 min per run)'
+
+### End editable parameters ###
+###############################
 
 rundate = datetime.now().strftime('%Y_%m_%d_%H-%M-%S')
 daynix_logo = (
@@ -613,17 +666,6 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
 
 
 if __name__ == "__main__":
-    export_dir = 'out'
-    remote_addr = '10.0.1.114'
-    local_addr = '10.0.0.157'
-    remote_iperf = 'C:\iperf\iperf.exe'
-    local_iperf = 'iperf'
-    gnuplot_bin = 'gnuplot'
-    test_range = [2**x for x in range(5,17)]  #32B --> 64KB
-    run_duration = 300
-    streams = 1
-    creds = 'creds.dat'
-    title = 'Test Results (5 min per run)'
     # Interrupt handling
     signal.signal(signal.SIGINT, interrupt_exit)
     # Run tests
