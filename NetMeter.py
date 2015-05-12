@@ -12,9 +12,12 @@
 # See file LICENSE supplied with this package for the full license text.
 
 import numpy as np
+import sys
 from datetime import datetime, timedelta
 from time import sleep
 from subprocess import Popen
+from os import makedirs
+from os.path import isdir, join
 
 
 rundate = datetime.now().strftime('%Y_%m_%d_%H-%M-%S')
@@ -145,6 +148,17 @@ daynix_logo = (
 
 def time_header():
     return datetime.now().strftime('[ %H:%M:%S ] ')
+
+
+def dir_prep(d):
+    if not isdir(d):
+        try:
+            makedirs(d)
+        except:
+            print('The output directory (' + d + ') could not be created. Exiting.')
+            sys.exit(1)
+    
+    print('The output directory is set to: \033[93m' + d + '\033[0m')
 
 
 def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outname):
@@ -444,7 +458,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate,
         outfile.write(content)
 
 
-def run_client(server_addr, runtime, p_size, queues, timestamp, credsfile = False):
+def run_client(server_addr, runtime, p_size, queues, export_dir, timestamp, credsfile = False):
     repetitions, mod = divmod(runtime, 10)
     if not mod:
         runtime -= 1
@@ -453,10 +467,10 @@ def run_client(server_addr, runtime, p_size, queues, timestamp, credsfile = Fals
     iperf_args =  ' -c ' + server_addr + ' -t ' + str(runtime) + ' -i 10 -l ' + str(p_size) + ' -P ' + str(queues) + ' -y C'
     if credsfile:
         iperf_command = 'winexe -A ' + credsfile + ' //' + remote_addr + ' "' + remote_iperf + iperf_args + '"'
-        basename = timestamp + '_g2h_' + size_name
+        basename = join(export_dir, timestamp, timestamp) + '_g2h_' + size_name
     else:
         iperf_command = local_iperf + iperf_args
-        basename = timestamp + '_h2g_' + size_name
+        basename = join(export_dir, timestamp, timestamp) + '_h2g_' + size_name
 
     commands = [
                 iperf_command + ' > ' + basename + '_iperf.dat',
@@ -480,11 +494,11 @@ def run_client(server_addr, runtime, p_size, queues, timestamp, credsfile = Fals
     if not iperf_proc.poll():
         print(time_header() + '\033[92mThe ' + size_name + ' test finished.\033[0m Waiting for 10 seconds.')
         sleep(10)
-        return basename, True
+        return True
     else:
         print(time_header() + '\033[91mThe Iperf test failed to finish.\033[0m Skipping in 10 seconds.')
         sleep(10)
-        return basename, False
+        return False
 
 
 def stop_server(server_addr = False, credsfile = False):
@@ -515,7 +529,9 @@ def run_server(server_addr = False, credsfile = False):
     sleep(10)
 
 
-def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, credsfile, test_title):
+def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, credsfile, test_title, export_dir):
+    dir_prep(join(export_dir, timestamp))
+    dir_time = join(export_dir, timestamp, timestamp)
     total_time = str(timedelta(seconds = 2 * len(p_sizes) * (runtime + 10) + 60))
     print(time_header() + '\033[92mStarting tests.\033[0m Expected total run time: ' + total_time)
     h2g_iperf_tot = []
@@ -528,7 +544,9 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
     stop_server(remote_addr, credsfile)
     run_server(remote_addr, credsfile)
     for p in p_sizes:
-        basename, finished = run_client(remote_addr, runtime, p, queues, timestamp, credsfile = False)
+        finished = run_client(remote_addr, runtime, p, queues, export_dir, timestamp, credsfile = False)
+        size_name = get_round_size_name(p)
+        basename = dir_time + '_h2g_' + size_name
         if finished:
             print('Parsing results...')
             iperf_array, tot_iperf_mean, tot_iperf_stdev = get_iperf_data_single(basename + '_iperf.dat')
@@ -542,21 +560,23 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
             print('Plotting...')
             pr = Popen(gnuplot_bin + ' ' + basename + '.plt', shell=True)
             pr.wait()
-            h2g_images.append(basename + '.png')
+            h2g_images.append(timestamp + '_h2g_' + size_name + '.png')
         else:
             h2g_images.append(get_round_size_name(p, gap = True))
 
     stop_server(remote_addr, credsfile)
     print('Plotting host --> guest summary...')
-    np.savetxt(timestamp + '_h2g_iperf_summary.dat', h2g_iperf_tot, fmt='%g', header='PacketSize(b) BW Stdev')
-    np.savetxt(timestamp + '_h2g_mpstat_summary.dat', h2g_mpstat_tot, fmt='%g', header='PacketSize(b) Frac Stdev')
-    write_gp(timestamp + '_h2g_summary.plt', timestamp + '_h2g_iperf_summary.dat', timestamp + '_h2g_mpstat_summary.dat',
-             timestamp + '_h2g_summary.png', tot_iperf_mean, plot_type = 'multisize', direction = 'h2g', packet_size = np.mean(p_sizes))
-    pr = Popen(gnuplot_bin + ' ' + timestamp + '_h2g_summary.plt', shell=True)
+    np.savetxt(dir_time + '_h2g_iperf_summary.dat', h2g_iperf_tot, fmt='%g', header='PacketSize(b) BW Stdev')
+    np.savetxt(dir_time + '_h2g_mpstat_summary.dat', h2g_mpstat_tot, fmt='%g', header='PacketSize(b) Frac Stdev')
+    write_gp(dir_time + '_h2g_summary.plt', dir_time + '_h2g_iperf_summary.dat', dir_time + '_h2g_mpstat_summary.dat',
+             dir_time + '_h2g_summary.png', tot_iperf_mean, plot_type = 'multisize', direction = 'h2g', packet_size = np.mean(p_sizes))
+    pr = Popen(gnuplot_bin + ' ' + dir_time + '_h2g_summary.plt', shell=True)
     pr.wait()
     run_server()
     for p in p_sizes:
-        basename, finished = run_client(local_addr, runtime, p, queues, timestamp, credsfile)
+        finished = run_client(local_addr, runtime, p, queues, export_dir, timestamp, credsfile)
+        size_name = get_round_size_name(p)
+        basename = dir_time + '_g2h_' + size_name
         if finished:
             print('Parsing results...')
             iperf_array, tot_iperf_mean, tot_iperf_stdev = get_iperf_data_single(basename + '_iperf.dat')
@@ -570,23 +590,24 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
             print('Plotting...')
             pr = Popen(gnuplot_bin + ' ' + basename + '.plt', shell=True)
             pr.wait()
-            g2h_images.append(basename + '.png')
+            g2h_images.append(timestamp + '_g2h_' + size_name + '.png')
         else:
             g2h_images.append(get_round_size_name(p, gap = True))
 
     stop_server()
     print('Plotting guest --> host summary...')
-    np.savetxt(timestamp + '_g2h_iperf_summary.dat', g2h_iperf_tot, fmt='%g', header='PacketSize(b) BW Stdev')
-    np.savetxt(timestamp + '_g2h_mpstat_summary.dat', g2h_mpstat_tot, fmt='%g', header='PacketSize(b) Frac Stdev')
-    write_gp(timestamp + '_g2h_summary.plt', timestamp + '_g2h_iperf_summary.dat', timestamp + '_g2h_mpstat_summary.dat',
-             timestamp + '_g2h_summary.png', tot_iperf_mean, plot_type = 'multisize', direction = 'g2h', packet_size = np.mean(p_sizes))
-    pr = Popen(gnuplot_bin + ' ' + timestamp + '_g2h_summary.plt', shell=True)
+    np.savetxt(dir_time + '_g2h_iperf_summary.dat', g2h_iperf_tot, fmt='%g', header='PacketSize(b) BW Stdev')
+    np.savetxt(dir_time + '_g2h_mpstat_summary.dat', g2h_mpstat_tot, fmt='%g', header='PacketSize(b) Frac Stdev')
+    write_gp(dir_time + '_g2h_summary.plt', dir_time + '_g2h_iperf_summary.dat', dir_time + '_g2h_mpstat_summary.dat',
+             dir_time + '_g2h_summary.png', tot_iperf_mean, plot_type = 'multisize', direction = 'g2h', packet_size = np.mean(p_sizes))
+    pr = Popen(gnuplot_bin + ' ' + dir_time + '_g2h_summary.plt', shell=True)
     pr.wait()
     print('Exporting html...')
-    gen_html(test_title, timestamp + '_h2g_summary.png', timestamp + '_g2h_summary.png', h2g_images, g2h_images, timestamp + '.html')
+    gen_html(test_title, timestamp + '_h2g_summary.png', timestamp + '_g2h_summary.png', h2g_images, g2h_images, dir_time + '.html')
 
 
 if __name__ == "__main__":
+    export_dir = 'out'
     remote_addr = '10.0.1.114'
     local_addr = '10.0.0.157'
     remote_iperf = 'C:\iperf\iperf.exe'
@@ -597,5 +618,5 @@ if __name__ == "__main__":
     streams = 1
     creds = 'creds.dat'
     title = 'Test Results (5 min per run)'
-    run_tests(remote_addr, local_addr, run_duration, test_range, streams, rundate, creds, title)
-    #run_client(local_addr, 120, 65000, 8, rundate, credsfile = 'creds.dat')
+    # Run tests
+    run_tests(remote_addr, local_addr, run_duration, test_range, streams, rundate, creds, title, export_dir)
