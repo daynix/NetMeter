@@ -13,6 +13,7 @@
 
 import numpy as np
 import sys
+import signal
 from datetime import datetime, timedelta
 from time import sleep
 from subprocess import Popen
@@ -148,6 +149,11 @@ daynix_logo = (
 
 def time_header():
     return datetime.now().strftime('[ %H:%M:%S ] ')
+
+
+def interrupt_exit(signal, frame):
+    print('\n\033[91mInterrupted by user. Exiting.\033[0m')
+    sys.exit(1)
 
 
 def dir_prep(d):
@@ -618,5 +624,7 @@ if __name__ == "__main__":
     streams = 1
     creds = 'creds.dat'
     title = 'Test Results (5 min per run)'
+    # Interrupt handling
+    signal.signal(signal.SIGINT, interrupt_exit)
     # Run tests
     run_tests(remote_addr, local_addr, run_duration, test_range, streams, rundate, creds, title, export_dir)
