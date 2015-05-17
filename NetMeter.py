@@ -220,7 +220,7 @@ def dir_prep(d):
     print('The output directory is set to: \033[93m' + d + '\033[0m')
 
 
-def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outname):
+def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outname, all_h2g_failed, all_g2h_failed):
     content = (
                '<!doctype html>\n'
                '<html>\n'
@@ -305,7 +305,15 @@ def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outna
                 '        <hr>\n'
                 '        <h2>By Packet Size</h2>\n'
                 )
-    content += '        <img src="' + h2g_summary + '">\n'
+    if all_h2g_failed:
+        content += (
+                    '        <div id="missing"><div></br></br>'
+                    '<h2>NOTICE: All tests failed!</h2>'
+                    '</br></br><h3>(See below...)</h3></div></div>\n'
+                    )
+    else:
+        content += '        <img src="' + h2g_summary + '">\n'
+
     content += (
                 '        <hr>\n'
                 '        <h2>By Time</h2>\n'
@@ -320,6 +328,7 @@ def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outna
                         '</h2><h3>(Host to Guest)</h3></br></br></br><h1>'
                         'Test failed to finish</h1></div></div>\n'
                         )
+
     content += (
                 '    </div>\n'
                 '    <div id="g2h">\n'
@@ -327,7 +336,15 @@ def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outna
                 '        <hr>\n'
                 '        <h2>By Packet Size</h2>\n'
                 )
-    content += '        <img src="' + g2h_summary + '">\n'
+    if all_g2h_failed:
+        content += (
+                    '        <div id="missing"><div></br></br>'
+                    '<h2>NOTICE: All tests failed!</h2>'
+                    '</br></br><h3>(See below...)</h3></div></div>\n'
+                    )
+    else:
+        content += '        <img src="' + g2h_summary + '">\n'
+
     content += (
                 '        <hr>\n'
                 '        <h2>By Time</h2>\n'
@@ -342,6 +359,7 @@ def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outna
                         '</h2><h3>(Guest to host)</h3></br></br></br><h1>'
                         'Test failed to finish</h1></div></div>\n'
                         )
+
     content += (
                 '    </div>\n'
                 '</div>\n'
@@ -599,9 +617,12 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
     g2h_mpstat_tot = []
     h2g_images = []
     g2h_images = []
+    all_h2g_failed = False
+    all_g2h_failed = False
     stop_server()
     stop_server(remote_addr, credsfile)
     run_server(remote_addr, credsfile)
+    tot_iperf_mean = -1.0
     for p in p_sizes:
         finished = run_client(remote_addr, runtime, p, queues, export_dir, timestamp, credsfile = False)
         size_name = get_round_size_name(p)
@@ -624,14 +645,19 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
             h2g_images.append(get_round_size_name(p, gap = True))
 
     stop_server(remote_addr, credsfile)
-    print('Plotting host --> guest summary...')
-    np.savetxt(dir_time + '_h2g_iperf_summary.dat', h2g_iperf_tot, fmt='%g', header='PacketSize(b) BW Stdev')
-    np.savetxt(dir_time + '_h2g_mpstat_summary.dat', h2g_mpstat_tot, fmt='%g', header='PacketSize(b) Frac Stdev')
-    write_gp(dir_time + '_h2g_summary.plt', dir_time + '_h2g_iperf_summary.dat', dir_time + '_h2g_mpstat_summary.dat',
-             dir_time + '_h2g_summary.png', tot_iperf_mean, plot_type = 'multisize', direction = 'h2g', packet_size = np.mean(p_sizes))
-    pr = Popen(gnuplot_bin + ' ' + dir_time + '_h2g_summary.plt', shell=True)
-    pr.wait()
+    if tot_iperf_mean > 0.0:
+        print('Plotting host --> guest summary...')
+        np.savetxt(dir_time + '_h2g_iperf_summary.dat', h2g_iperf_tot, fmt='%g', header='PacketSize(b) BW Stdev')
+        np.savetxt(dir_time + '_h2g_mpstat_summary.dat', h2g_mpstat_tot, fmt='%g', header='PacketSize(b) Frac Stdev')
+        write_gp(dir_time + '_h2g_summary.plt', dir_time + '_h2g_iperf_summary.dat', dir_time + '_h2g_mpstat_summary.dat',
+                 dir_time + '_h2g_summary.png', tot_iperf_mean, plot_type = 'multisize', direction = 'h2g', packet_size = np.mean(p_sizes))
+        pr = Popen(gnuplot_bin + ' ' + dir_time + '_h2g_summary.plt', shell=True)
+        pr.wait()
+    else:
+        all_h2g_failed = True
+
     run_server()
+    tot_iperf_mean = -1.0
     for p in p_sizes:
         finished = run_client(local_addr, runtime, p, queues, export_dir, timestamp, credsfile)
         size_name = get_round_size_name(p)
@@ -654,15 +680,20 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
             g2h_images.append(get_round_size_name(p, gap = True))
 
     stop_server()
-    print('Plotting guest --> host summary...')
-    np.savetxt(dir_time + '_g2h_iperf_summary.dat', g2h_iperf_tot, fmt='%g', header='PacketSize(b) BW Stdev')
-    np.savetxt(dir_time + '_g2h_mpstat_summary.dat', g2h_mpstat_tot, fmt='%g', header='PacketSize(b) Frac Stdev')
-    write_gp(dir_time + '_g2h_summary.plt', dir_time + '_g2h_iperf_summary.dat', dir_time + '_g2h_mpstat_summary.dat',
-             dir_time + '_g2h_summary.png', tot_iperf_mean, plot_type = 'multisize', direction = 'g2h', packet_size = np.mean(p_sizes))
-    pr = Popen(gnuplot_bin + ' ' + dir_time + '_g2h_summary.plt', shell=True)
-    pr.wait()
+    if tot_iperf_mean > 0.0:
+        print('Plotting guest --> host summary...')
+        np.savetxt(dir_time + '_g2h_iperf_summary.dat', g2h_iperf_tot, fmt='%g', header='PacketSize(b) BW Stdev')
+        np.savetxt(dir_time + '_g2h_mpstat_summary.dat', g2h_mpstat_tot, fmt='%g', header='PacketSize(b) Frac Stdev')
+        write_gp(dir_time + '_g2h_summary.plt', dir_time + '_g2h_iperf_summary.dat', dir_time + '_g2h_mpstat_summary.dat',
+                 dir_time + '_g2h_summary.png', tot_iperf_mean, plot_type = 'multisize', direction = 'g2h', packet_size = np.mean(p_sizes))
+        pr = Popen(gnuplot_bin + ' ' + dir_time + '_g2h_summary.plt', shell=True)
+        pr.wait()
+    else:
+        all_g2h_failed = True
+
     print('Exporting html...')
-    gen_html(test_title, timestamp + '_h2g_summary.png', timestamp + '_g2h_summary.png', h2g_images, g2h_images, dir_time + '.html')
+    gen_html(test_title, timestamp + '_h2g_summary.png', timestamp + '_g2h_summary.png', h2g_images, g2h_images,
+             dir_time + '.html', all_h2g_failed, all_g2h_failed)
 
 
 if __name__ == "__main__":
