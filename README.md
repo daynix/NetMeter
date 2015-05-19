@@ -20,6 +20,7 @@ In order to run the NetMeter one needs:
 * On the host:
  * Python 3
  * Numpy (for Python 3)
+ * Winexe
  * Iperf 2 (_IMPORTANT_: Version 2.0.5 or later, _i.e._ the **latest** version!)
  * gnuplot
 * On the guest:
