@@ -59,6 +59,10 @@ run_duration = 300
 # Example: 1
 streams = 4
 
+# The desired protocol(s). [iterable]
+# The value MUST be one of 3: ['TCP'] | ['UDP'] | ['TCP', 'UDP']
+protocols = ['TCP', 'UDP']
+
 # A path to the credentials file for Windows access, which consists of three lines: [str]
 #    username=<USERNAME>  (You probably want to use the username Administrator)
 #    password=<PASSWORD>
@@ -220,7 +224,7 @@ def dir_prep(d):
     print('The output directory is set to: \033[93m' + d + '\033[0m')
 
 
-def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outname, all_h2g_failed, all_g2h_failed):
+def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outname, protocol, all_h2g_failed, all_g2h_failed):
     content = (
                '<!doctype html>\n'
                '<html>\n'
@@ -296,7 +300,7 @@ def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outna
                '<body>\n'
                '<div id="header">\n'
                )
-    content += '    <h3>' + title + '</h3>\n'
+    content += '    <h3>' + title + ' [' + protocol + ']</h3>\n'
     content += (
                 '</div>\n'
                 '<div id="container">\n'
@@ -325,7 +329,7 @@ def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outna
             content += (
                         '        <div id="missing"><div><h2>Packet size: '
                         + f +
-                        '</h2><h3>(Host to Guest)</h3></br></br></br><h1>'
+                        '</h2><h3>(Host to Guest, ' + protocol + ')</h3></br></br></br><h1>'
                         'Test failed to finish</h1></div></div>\n'
                         )
 
@@ -356,7 +360,7 @@ def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outna
             content += (
                         '        <div id="missing"><div><h2>Packet size: '
                         + f +
-                        '</h2><h3>(Guest to host)</h3></br></br></br><h1>'
+                        '</h2><h3>(Guest to host, ' + protocol + ')</h3></br></br></br><h1>'
                         'Test failed to finish</h1></div></div>\n'
                         )
 
@@ -402,6 +406,9 @@ def get_iperf_data_single(iperf_out):
     with open(iperf_out, encoding='utf-8', errors='ignore') as inputfile:
         for line in inputfile:
             tmp_lst = line.strip().split(',')
+            if (not tmp_lst[0].isdigit()) or (len(tmp_lst) != 9):
+                continue
+
             if (int(tmp_lst[-4]) > 0):
                 date = datetime.strptime(tmp_lst[0], '%Y%m%d%H%M%S')
                 if not iperf_data:
@@ -473,7 +480,7 @@ def export_single_data(data_processed, data_outname):
     np.savetxt(data_outname, data_processed, fmt='%g', header='TimeStamp(s) Sum Stdev')
 
 
-def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate,
+def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protocol,
              plot_type = 'singlesize', direction = 'h2g', packet_size = 0.0):
     try:
         net_rate, rate_units, rate_factor = get_size_units_factor(net_rate, rate=True)
@@ -502,15 +509,15 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate,
         rotate_xtics = 'set xtics rotate by -30\n'
 
     if direction == 'h2g':
-        plot_subtitle = '(Host to Guest)'
+        plot_subtitle = 'Host to Guest'
     else:
-        plot_subtitle = '(Guest to Host)'
+        plot_subtitle = 'Guest to Host'
 
     content = (
                'set terminal pngcairo nocrop enhanced size 1024,768 font "Verdana,15"\n'
                'set output "' + img_file +'"\n'
                '\n'
-               'set title "{/=20 ' + plot_title + '}\\n\\n{/=18 ' + plot_subtitle + '}"\n'
+               'set title "{/=20 ' + plot_title + '}\\n\\n{/=18 (' + plot_subtitle + ', ' + protocol + ')}"\n'
                + rate_format + '\n'
                'set xlabel "' + x_title + '"\n'
                'set ylabel "Bandwidth (' + rate_units + ')"\n'
@@ -535,19 +542,44 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate,
         outfile.write(content)
 
 
-def run_client(server_addr, runtime, p_size, queues, export_dir, timestamp, credsfile = False):
+def set_protocol_opts(protocol, client = True):
+    if protocol == 'TCP':
+        return ''
+    elif protocol == 'UDP':
+        if client:
+            return ' -u -b 1000000M'
+        else:
+            return ' -u'
+
+    else:
+        print('Protocol must be either "TCP" or "UDP". Exiting.')
+        sys.exit(1)
+
+
+def run_client(server_addr, runtime, p_size, queues, export_dir, timestamp, protocol, credsfile = False):
+    if (protocol == 'UDP'):
+        if (p_size > 65507) and (p_size <= 65536):
+            # Allow 2**16 (64KB) UDP tests to pass (ignore up to 29 bytes)
+            p_size = 65507
+        elif (p_size > 65536):
+            print(time_header() + '\033[91mDatagram size too big for UDP.\033[0m Skipping test...')
+            return False
+
     repetitions, mod = divmod(runtime, 10)
     if not mod:
         runtime -= 1
 
     size_name = get_round_size_name(p_size)
-    iperf_args =  ' -c ' + server_addr + ' -t ' + str(runtime) + ' -i 10 -l ' + str(p_size) + ' -P ' + str(queues) + ' -y C'
+    protocol_opts = set_protocol_opts(protocol)
+    iperf_args =  (' -c ' + server_addr + protocol_opts + ' -t ' + str(runtime) + ' -i 10 -l '
+                   + str(p_size) + ' -P ' + str(queues) + ' -y C')
+    dir_time = join(export_dir, timestamp + '_' + protocol, protocol + '_' + timestamp)
     if credsfile:
         iperf_command = 'winexe -A ' + credsfile + ' //' + remote_addr + ' "' + remote_iperf + iperf_args + '"'
-        basename = join(export_dir, timestamp, timestamp) + '_g2h_' + size_name
+        basename = dir_time + '_g2h_' + size_name
     else:
         iperf_command = local_iperf + iperf_args
-        basename = join(export_dir, timestamp, timestamp) + '_h2g_' + size_name
+        basename = dir_time + '_h2g_' + size_name
 
     commands = [
                 iperf_command + ' > ' + basename + '_iperf.dat',
@@ -591,8 +623,9 @@ def stop_server(server_addr = False, credsfile = False):
     sleep(10)
 
 
-def run_server(server_addr = False, credsfile = False):
-    iperf_args =  ' -s'
+def run_server(protocol, server_addr = False, credsfile = False):
+    protocol_opts = set_protocol_opts(protocol, client = False)
+    iperf_args =  ' -s' + protocol_opts
     if credsfile and server_addr:
         iperf_command = 'winexe -A ' + credsfile + ' //' + server_addr + ' "' + remote_iperf + iperf_args + '"'
         rem_loc = 'remote'
@@ -606,11 +639,11 @@ def run_server(server_addr = False, credsfile = False):
     sleep(10)
 
 
-def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, credsfile, test_title, export_dir):
-    dir_prep(join(export_dir, timestamp))
-    dir_time = join(export_dir, timestamp, timestamp)
+def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, credsfile, test_title, protocol, export_dir):
+    dir_prep(join(export_dir, timestamp + '_' + protocol))
+    dir_time = join(export_dir, timestamp + '_' + protocol, protocol + '_' + timestamp)
     total_time = str(timedelta(seconds = 2 * len(p_sizes) * (runtime + 10) + 60))
-    print(time_header() + '\033[92mStarting tests.\033[0m Expected total run time: ' + total_time)
+    print(time_header() + '\033[92mStarting ' + protocol + ' tests.\033[0m Expected total run time: ' + total_time)
     h2g_iperf_tot = []
     h2g_mpstat_tot = []
     g2h_iperf_tot = []
@@ -621,10 +654,10 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
     all_g2h_failed = False
     stop_server()
     stop_server(remote_addr, credsfile)
-    run_server(remote_addr, credsfile)
+    run_server(protocol, remote_addr, credsfile)
     tot_iperf_mean = -1.0
     for p in p_sizes:
-        finished = run_client(remote_addr, runtime, p, queues, export_dir, timestamp, credsfile = False)
+        finished = run_client(remote_addr, runtime, p, queues, export_dir, timestamp, protocol, credsfile = False)
         size_name = get_round_size_name(p)
         basename = dir_time + '_h2g_' + size_name
         if finished:
@@ -636,11 +669,11 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
             export_single_data(iperf_array, basename + '_iperf_processed.dat')
             export_single_data(mpstat_array, basename + '_mpstat_processed.dat')
             write_gp(basename + '.plt', basename + '_iperf_processed.dat', basename + '_mpstat_processed.dat', basename + '.png',
-                     tot_iperf_mean, plot_type = 'singlesize', direction = 'h2g', packet_size = p)
+                     tot_iperf_mean, protocol, plot_type = 'singlesize', direction = 'h2g', packet_size = p)
             print('Plotting...')
             pr = Popen(gnuplot_bin + ' ' + basename + '.plt', shell=True)
             pr.wait()
-            h2g_images.append(timestamp + '_h2g_' + size_name + '.png')
+            h2g_images.append(protocol + '_' + timestamp + '_h2g_' + size_name + '.png')
         else:
             h2g_images.append(get_round_size_name(p, gap = True))
 
@@ -650,16 +683,16 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
         np.savetxt(dir_time + '_h2g_iperf_summary.dat', h2g_iperf_tot, fmt='%g', header='PacketSize(b) BW Stdev')
         np.savetxt(dir_time + '_h2g_mpstat_summary.dat', h2g_mpstat_tot, fmt='%g', header='PacketSize(b) Frac Stdev')
         write_gp(dir_time + '_h2g_summary.plt', dir_time + '_h2g_iperf_summary.dat', dir_time + '_h2g_mpstat_summary.dat',
-                 dir_time + '_h2g_summary.png', tot_iperf_mean, plot_type = 'multisize', direction = 'h2g', packet_size = np.mean(p_sizes))
+                 dir_time + '_h2g_summary.png', tot_iperf_mean, protocol, plot_type = 'multisize', direction = 'h2g', packet_size = np.mean(p_sizes))
         pr = Popen(gnuplot_bin + ' ' + dir_time + '_h2g_summary.plt', shell=True)
         pr.wait()
     else:
         all_h2g_failed = True
 
-    run_server()
+    run_server(protocol)
     tot_iperf_mean = -1.0
     for p in p_sizes:
-        finished = run_client(local_addr, runtime, p, queues, export_dir, timestamp, credsfile)
+        finished = run_client(local_addr, runtime, p, queues, export_dir, timestamp, protocol, credsfile)
         size_name = get_round_size_name(p)
         basename = dir_time + '_g2h_' + size_name
         if finished:
@@ -671,11 +704,11 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
             export_single_data(iperf_array, basename + '_iperf_processed.dat')
             export_single_data(mpstat_array, basename + '_mpstat_processed.dat')
             write_gp(basename + '.plt', basename + '_iperf_processed.dat', basename + '_mpstat_processed.dat', basename + '.png',
-                     tot_iperf_mean, plot_type = 'singlesize', direction = 'g2h', packet_size = p)
+                     tot_iperf_mean, protocol, plot_type = 'singlesize', direction = 'g2h', packet_size = p)
             print('Plotting...')
             pr = Popen(gnuplot_bin + ' ' + basename + '.plt', shell=True)
             pr.wait()
-            g2h_images.append(timestamp + '_g2h_' + size_name + '.png')
+            g2h_images.append(protocol + '_' + timestamp + '_g2h_' + size_name + '.png')
         else:
             g2h_images.append(get_round_size_name(p, gap = True))
 
@@ -685,19 +718,24 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
         np.savetxt(dir_time + '_g2h_iperf_summary.dat', g2h_iperf_tot, fmt='%g', header='PacketSize(b) BW Stdev')
         np.savetxt(dir_time + '_g2h_mpstat_summary.dat', g2h_mpstat_tot, fmt='%g', header='PacketSize(b) Frac Stdev')
         write_gp(dir_time + '_g2h_summary.plt', dir_time + '_g2h_iperf_summary.dat', dir_time + '_g2h_mpstat_summary.dat',
-                 dir_time + '_g2h_summary.png', tot_iperf_mean, plot_type = 'multisize', direction = 'g2h', packet_size = np.mean(p_sizes))
+                 dir_time + '_g2h_summary.png', tot_iperf_mean, protocol, plot_type = 'multisize', direction = 'g2h', packet_size = np.mean(p_sizes))
         pr = Popen(gnuplot_bin + ' ' + dir_time + '_g2h_summary.plt', shell=True)
         pr.wait()
     else:
         all_g2h_failed = True
 
     print('Exporting html...')
-    gen_html(test_title, timestamp + '_h2g_summary.png', timestamp + '_g2h_summary.png', h2g_images, g2h_images,
-             dir_time + '.html', all_h2g_failed, all_g2h_failed)
+    gen_html(test_title, protocol + '_' + timestamp + '_h2g_summary.png', protocol + '_' + timestamp + '_g2h_summary.png',
+             h2g_images, g2h_images, dir_time + '.html', protocol, all_h2g_failed, all_g2h_failed)
+
+
+def run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, credsfile, test_title, protocols, export_dir):
+    for p in protocols:
+        run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, credsfile, test_title, p, export_dir)
 
 
 if __name__ == "__main__":
     # Interrupt handling
     signal.signal(signal.SIGINT, interrupt_exit)
     # Run tests
-    run_tests(remote_addr, local_addr, run_duration, test_range, streams, rundate, creds, title, export_dir)
+    run_tests_for_protocols(remote_addr, local_addr, run_duration, test_range, streams, rundate, creds, title, protocols, export_dir)
