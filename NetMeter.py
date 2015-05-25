@@ -35,9 +35,9 @@ remote_addr = '10.0.1.114'
 # Example: '10.0.0.157'
 local_addr = '10.0.0.157'
 
-# Path to the Iperf executable on the guest. [str]
-# Example: 'C:\iperf\iperf.exe'
-remote_iperf = 'C:\iperf\iperf.exe'
+# Path to the Iperf executable on the guest. [raw str]
+# Example: r'C:\iperf\iperf.exe'
+remote_iperf = r'C:\iperf\iperf.exe'
 
 # Path to the Iperf executable on the host (local). [str]
 # Example: 'iperf'

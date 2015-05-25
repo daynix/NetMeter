@@ -34,7 +34,7 @@ These options are:
 * `export_dir`: [string] Export directory. The results will be saved there (example: `'/home/daynix/out'`).
 * `remote_addr`: [string] IP of the guest (example: `'10.0.1.114'`).
 * `local_addr`: [string] Ip of the host, which the guest can connect to (example: `'10.0.0.157'`).
-* `remote_iperf`: [string] Path to the Iperf executable on the guest (example: `'C:\iperf\iperf.exe'`).
+* `remote_iperf`: [raw string] Path to the Iperf executable on the guest (example: `r'C:\iperf\iperf.exe'`).
 * `local_iperf`: [string] Path to the Iperf executable on the host (local). (Example: `'iperf'`)
 * `gnuplot_bin`: [string] Path to the gnuplot executable on the host (local). (Example: `'gnuplot'`)
 * `test_range`: [iterable] A list of packet sizes to test (preferably as powers of 2). (Example: `[2**x for x in range(5,17)]` - for sizes of  32B to 64KB)
