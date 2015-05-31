@@ -631,7 +631,6 @@ def run_server(protocol, server_addr = False, credsfile = False):
     else:
         iperf_command = local_iperf + iperf_args
         rem_loc = 'local'
-        error_note = ''
 
     print('Starting ' + rem_loc + ' server...')
     p = Popen(iperf_command, shell=True)
