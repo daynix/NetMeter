@@ -5,8 +5,7 @@
 #
 # Maintained by bricklets@daynix.com
 #
-# This file is a part of Bricklets library, see "Bricklets" page
-# on www.daynix.com for more.
+# For documentation please refer to README.md available at https://github.com/daynix/NetMeter
 #
 # This code is licensed under standard 3-clause BSD license.
 # See file LICENSE supplied with this package for the full license text.
