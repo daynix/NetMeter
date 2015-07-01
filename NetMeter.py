@@ -311,7 +311,7 @@ def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outna
     if all_h2g_failed:
         content += (
                     '        <div id="missing"><div></br></br>'
-                    '<h2>NOTICE: All tests failed!</h2>'
+                    '<h2>NOTICE: All tests failed to finish!</h2>'
                     '</br></br><h3>(See below...)</h3></div></div>\n'
                     )
     else:
@@ -342,7 +342,7 @@ def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outna
     if all_g2h_failed:
         content += (
                     '        <div id="missing"><div></br></br>'
-                    '<h2>NOTICE: All tests failed!</h2>'
+                    '<h2>NOTICE: All tests failed to finish!</h2>'
                     '</br></br><h3>(See below...)</h3></div></div>\n'
                     )
     else:
@@ -425,6 +425,11 @@ def get_iperf_data_single(iperf_out):
     iperf_data = iperf_data[bi_sorted_indices]
     num_conn = np.unique(iperf_data[:,1]).shape[0]
     #print(str(num_conn) + str(iperf_data.shape))
+    # In case test was not complete, and the few last connections data is missing
+    extra_connections = iperf_data.shape[0] % num_conn
+    if extra_connections:
+        iperf_data = iperf_data[:-extra_connections]
+
     iperf_data = iperf_data[:,[0,2]].reshape((num_conn, iperf_data.shape[0]/num_conn, 2))
     iperf_data = np.ma.masked_array(iperf_data, np.isnan(iperf_data))
     #iperf_mean = np.mean(iperf_data, axis=0)
@@ -480,7 +485,7 @@ def export_single_data(data_processed, data_outname):
 
 
 def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protocol,
-             plot_type = 'singlesize', direction = 'h2g', packet_size = 0.0):
+             plot_type = 'singlesize', direction = 'h2g', finished = True, packet_size = 0.0):
     try:
         net_rate, rate_units, rate_factor = get_size_units_factor(net_rate, rate=True)
         rate_format = ''
@@ -488,7 +493,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
         net_rate = '???'
         rate_units = 'b/s'
         rate_factor = '1.0'
-        rate_format = 'set format y "%.1tx10^%T"'
+        rate_format = 'set format y "%.1tx10^%T"\n'
 
     packet_size = get_round_size_name(packet_size, gap = True)
     if plot_type == 'singlesize':
@@ -512,12 +517,18 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
     else:
         plot_subtitle = 'Guest to Host'
 
+    if finished:
+        warning_message = ''
+    else:
+        warning_message = 'set label "Warning:\\nTest failed to finish!\\nThe results are partial!" at screen 0.01, screen 0.96 tc rgb "red"\n'
+
     content = (
                'set terminal pngcairo nocrop enhanced size 1024,768 font "Verdana,15"\n'
                'set output "' + img_file +'"\n'
                '\n'
                'set title "{/=20 ' + plot_title + '}\\n\\n{/=18 (' + plot_subtitle + ', ' + protocol + ')}"\n'
-               + rate_format + '\n'
+               + rate_format + warning_message +
+               '\n'
                'set xlabel "' + x_title + '"\n'
                'set ylabel "Bandwidth (' + rate_units + ')"\n'
                'set ytics nomirror\n'
@@ -655,10 +666,10 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
     run_server(protocol, remote_addr, credsfile)
     tot_iperf_mean = -1.0
     for p in p_sizes:
-        finished = run_client(remote_addr, runtime, p, queues, export_dir, timestamp, protocol, credsfile = False)
-        size_name = get_round_size_name(p)
-        basename = dir_time + '_h2g_' + size_name
-        if finished:
+        try:
+            test_completed = run_client(remote_addr, runtime, p, queues, export_dir, timestamp, protocol, credsfile = False)
+            size_name = get_round_size_name(p)
+            basename = dir_time + '_h2g_' + size_name
             print('Parsing results...')
             iperf_array, tot_iperf_mean, tot_iperf_stdev = get_iperf_data_single(basename + '_iperf.dat')
             h2g_iperf_tot.append([ p, tot_iperf_mean, tot_iperf_stdev ])
@@ -667,12 +678,12 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
             export_single_data(iperf_array, basename + '_iperf_processed.dat')
             export_single_data(mpstat_array, basename + '_mpstat_processed.dat')
             write_gp(basename + '.plt', basename + '_iperf_processed.dat', basename + '_mpstat_processed.dat', basename + '.png',
-                     tot_iperf_mean, protocol, plot_type = 'singlesize', direction = 'h2g', packet_size = p)
+                     tot_iperf_mean, protocol, plot_type = 'singlesize', direction = 'h2g', finished = test_completed, packet_size = p)
             print('Plotting...')
             pr = Popen(gnuplot_bin + ' ' + basename + '.plt', shell=True)
             pr.wait()
             h2g_images.append(protocol + '_' + timestamp + '_h2g_' + size_name + '.png')
-        else:
+        except:
             h2g_images.append(get_round_size_name(p, gap = True))
 
     stop_server(remote_addr, credsfile)
@@ -690,10 +701,10 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
     run_server(protocol)
     tot_iperf_mean = -1.0
     for p in p_sizes:
-        finished = run_client(local_addr, runtime, p, queues, export_dir, timestamp, protocol, credsfile)
-        size_name = get_round_size_name(p)
-        basename = dir_time + '_g2h_' + size_name
-        if finished:
+        try:
+            test_completed = run_client(local_addr, runtime, p, queues, export_dir, timestamp, protocol, credsfile)
+            size_name = get_round_size_name(p)
+            basename = dir_time + '_g2h_' + size_name
             print('Parsing results...')
             iperf_array, tot_iperf_mean, tot_iperf_stdev = get_iperf_data_single(basename + '_iperf.dat')
             g2h_iperf_tot.append([ p, tot_iperf_mean, tot_iperf_stdev ])
@@ -702,12 +713,12 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
             export_single_data(iperf_array, basename + '_iperf_processed.dat')
             export_single_data(mpstat_array, basename + '_mpstat_processed.dat')
             write_gp(basename + '.plt', basename + '_iperf_processed.dat', basename + '_mpstat_processed.dat', basename + '.png',
-                     tot_iperf_mean, protocol, plot_type = 'singlesize', direction = 'g2h', packet_size = p)
+                     tot_iperf_mean, protocol, plot_type = 'singlesize', direction = 'g2h', finished = test_completed, packet_size = p)
             print('Plotting...')
             pr = Popen(gnuplot_bin + ' ' + basename + '.plt', shell=True)
             pr.wait()
             g2h_images.append(protocol + '_' + timestamp + '_g2h_' + size_name + '.png')
-        else:
+        except:
             g2h_images.append(get_round_size_name(p, gap = True))
 
     stop_server()
