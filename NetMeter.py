@@ -629,8 +629,8 @@ def run_server(protocol, server_addr = False, credsfile = False):
 
 
 def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, credsfile, test_title, protocol, export_dir):
-    total_time = str(timedelta(seconds = 2 * len(p_sizes) * (runtime + 10) + 60))
-    print(time_header() + '\033[92mStarting ' + protocol + ' tests.\033[0m Expected total run time: ' + total_time)
+    series_time = str(timedelta(seconds = 2 * len(p_sizes) * (runtime + 10) + 60))
+    print(time_header() + '\033[92mStarting ' + protocol + ' tests.\033[0m Expected run time: ' + series_time)
     dir_prep(join(export_dir, timestamp + '_' + protocol))
     dir_time = join(export_dir, timestamp + '_' + protocol, protocol + '_' + timestamp)
     h2g_images = []
@@ -708,5 +708,10 @@ def run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, queues, t
 if __name__ == "__main__":
     # Interrupt handling
     signal.signal(signal.SIGINT, interrupt_exit)
+    # Write message
+    if len(protocols) > 1:
+        total_time = str(timedelta(seconds = (2 * len(test_range) * (run_duration + 10) + 60) * len(protocols)))
+        print(time_header() + '\033[92mStarting tests for protocols: ' + ', '.join(protocols) + '.\033[0m Expected total run time: ' + total_time)
+
     # Run tests
     run_tests_for_protocols(remote_addr, local_addr, run_duration, test_range, streams, rundate, creds, title, protocols, export_dir)
