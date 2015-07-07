@@ -549,7 +549,7 @@ def set_protocol_opts(protocol, client = True):
         sys.exit(1)
 
 
-def run_client(server_addr, runtime, p_size, queues, basename, protocol, credsfile = False):
+def run_client(server_addr, runtime, p_size, queues, init_name, protocol, credsfile = False):
     if (protocol == 'UDP'):
         if (p_size > 65507) and (p_size <= 65536):
             # Allow 2**16 (64KB) UDP tests to pass (ignore up to 29 bytes)
@@ -571,8 +571,8 @@ def run_client(server_addr, runtime, p_size, queues, basename, protocol, credsfi
         iperf_command = local_iperf + iperf_args
 
     commands = [
-                iperf_command + ' > ' + basename + '_iperf.dat',
-                'mpstat -P ALL 10 ' + str(repetitions) + ' > ' + basename + '_mpstat.dat',
+                iperf_command + ' > ' + init_name + '_iperf.dat',
+                'mpstat -P ALL 10 ' + str(repetitions) + ' > ' + init_name + '_mpstat.dat',
                ]
     size_name = get_round_size_name(p_size)
     print(time_header() + 'Running ' + size_name + ' test. (Duration: '
@@ -659,25 +659,25 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
         mpstat_tot = []
         for p in p_sizes:
             size_name = get_round_size_name(p)
-            basename = dir_time + '_' + direction + '_' + size_name
+            init_name = dir_time + '_' + direction + '_' + size_name
             iperf_sumname = dir_time + '_' + direction + '_iperf_summary'
             mpstat_sumname = dir_time + '_' + direction + '_mpstat_summary'
             combined_sumname = dir_time + '_' + direction + '_summary'
             try:
-                test_completed = run_client(server_addr, runtime, p, queues, basename, protocol, client_creds)
+                test_completed = run_client(server_addr, runtime, p, queues, init_name, protocol, client_creds)
                 print('Parsing results...')
-                iperf_array, tot_iperf_mean, tot_iperf_stdev = get_iperf_data_single(basename + '_iperf.dat')
+                iperf_array, tot_iperf_mean, tot_iperf_stdev = get_iperf_data_single(init_name + '_iperf.dat')
                 iperf_tot.append([ p, tot_iperf_mean, tot_iperf_stdev ])
-                mpstat_array, tot_mpstat_mean, tot_mpstat_stdev = get_mpstat_data_single(basename + '_mpstat.dat')
+                mpstat_array, tot_mpstat_mean, tot_mpstat_stdev = get_mpstat_data_single(init_name + '_mpstat.dat')
                 mpstat_tot.append([ p, tot_mpstat_mean, tot_mpstat_stdev ])
-                export_single_data(iperf_array, basename + '_iperf_processed.dat')
-                export_single_data(mpstat_array, basename + '_mpstat_processed.dat')
-                write_gp(basename + '.plt', basename + '_iperf_processed.dat', basename + '_mpstat_processed.dat', basename + '.png',
+                export_single_data(iperf_array, init_name + '_iperf_processed.dat')
+                export_single_data(mpstat_array, init_name + '_mpstat_processed.dat')
+                write_gp(init_name + '.plt', init_name + '_iperf_processed.dat', init_name + '_mpstat_processed.dat', init_name + '.png',
                          tot_iperf_mean, protocol, plot_type = 'singlesize', direction = direction, finished = test_completed, packet_size = p)
                 print('Plotting...')
-                pr = Popen(gnuplot_bin + ' ' + basename + '.plt', shell=True)
+                pr = Popen(gnuplot_bin + ' ' + init_name + '.plt', shell=True)
                 pr.wait()
-                image_list.append(basename.split('/')[-1] + '.png')
+                image_list.append(init_name.split('/')[-1] + '.png')
             except:
                 image_list.append(get_round_size_name(p, gap = True))
 
