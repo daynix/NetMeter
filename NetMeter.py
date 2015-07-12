@@ -559,6 +559,22 @@ def bend_max_size(size, protocol):
         return size
 
 
+def run_server(protocol, p_size, init_name, server_addr = False, credsfile = False):
+    p_size = bend_max_size(p_size, protocol)
+    protocol_opts = set_protocol_opts(protocol, client = False)
+    iperf_args = ' -s' + protocol_opts + ' -i 10 -l ' + str(p_size) + ' -y C'
+    if credsfile:
+        iperf_command = 'winexe -A ' + credsfile + ' //' + server_addr + ' "' + remote_iperf + iperf_args + '"'
+        rem_loc = 'remote'
+    else:
+        iperf_command = local_iperf + iperf_args
+        rem_loc = 'local'
+
+    print('Starting ' + rem_loc + ' server...')
+    p = Popen(iperf_command + ' > ' + init_name + '_iperf.dat', shell=True)
+    sleep(10)
+
+
 def run_client(server_addr, runtime, p_size, queues, init_name, protocol, credsfile = False):
     p_size = bend_max_size(p_size, protocol)
     repetitions, mod = divmod(runtime, 10)
@@ -613,22 +629,6 @@ def stop_server(server_addr = False, credsfile = False):
 
     p = Popen(iperf_stop_command, shell=True)
     p.wait()
-    sleep(10)
-
-
-def run_server(protocol, p_size, init_name, server_addr = False, credsfile = False):
-    p_size = bend_max_size(p_size, protocol)
-    protocol_opts = set_protocol_opts(protocol, client = False)
-    iperf_args = ' -s' + protocol_opts + ' -i 10 -l ' + str(p_size) + ' -y C'
-    if credsfile:
-        iperf_command = 'winexe -A ' + credsfile + ' //' + server_addr + ' "' + remote_iperf + iperf_args + '"'
-        rem_loc = 'remote'
-    else:
-        iperf_command = local_iperf + iperf_args
-        rem_loc = 'local'
-
-    print('Starting ' + rem_loc + ' server...')
-    p = Popen(iperf_command + ' > ' + init_name + '_iperf.dat', shell=True)
     sleep(10)
 
 
