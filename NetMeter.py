@@ -549,29 +549,32 @@ def set_protocol_opts(protocol, client = True):
         sys.exit(1)
 
 
-def run_client(server_addr, runtime, p_size, queues, init_name, protocol, credsfile = False):
-    if (protocol == 'UDP'):
-        if (p_size > 65507) and (p_size <= 65536):
-            # Allow 2**16 (64KB) UDP tests to pass (ignore up to 29 bytes)
-            p_size = 65507
-        elif (p_size > 65536):
-            print(time_header() + '\033[91mDatagram size too big for UDP.\033[0m Skipping test...')
-            return False
+def bend_max_size(size, protocol):
+    if (protocol == 'UDP') and (size > 65507) and (size <= 65536):
+        # Allow 2**16 (64KB) UDP tests to pass (ignore up to 29 bytes)
+        return 65507
+    elif (protocol == 'UDP') and (size > 65536):
+        raise ValueError('Datagram size too big for UDP.')
+    else:
+        return size
 
+
+def run_client(server_addr, runtime, p_size, queues, init_name, protocol, credsfile = False):
+    p_size = bend_max_size(p_size, protocol)
     repetitions, mod = divmod(runtime, 10)
     if not mod:
         runtime -= 1
 
     protocol_opts = set_protocol_opts(protocol)
-    iperf_args =  (' -c ' + server_addr + protocol_opts + ' -t ' + str(runtime) + ' -i 10 -l '
-                   + str(p_size) + ' -P ' + str(queues) + ' -y C')
+    iperf_args =  (' -c ' + server_addr + protocol_opts + ' -t ' + str(runtime) + ' -l ' + str(p_size)
+                   + ' -P ' + str(queues))
     if credsfile:
         iperf_command = 'winexe -A ' + credsfile + ' //' + remote_addr + ' "' + remote_iperf + iperf_args + '"'
     else:
         iperf_command = local_iperf + iperf_args
 
     commands = [
-                iperf_command + ' > ' + init_name + '_iperf.dat',
+                iperf_command,
                 'mpstat -P ALL 10 ' + str(repetitions) + ' > ' + init_name + '_mpstat.dat',
                ]
     size_name = get_round_size_name(p_size)
@@ -613,9 +616,10 @@ def stop_server(server_addr = False, credsfile = False):
     sleep(10)
 
 
-def run_server(protocol, server_addr = False, credsfile = False):
+def run_server(protocol, p_size, init_name, server_addr = False, credsfile = False):
+    p_size = bend_max_size(p_size, protocol)
     protocol_opts = set_protocol_opts(protocol, client = False)
-    iperf_args =  ' -s' + protocol_opts
+    iperf_args = ' -s' + protocol_opts + ' -i 10 -l ' + str(p_size) + ' -y C'
     if credsfile:
         iperf_command = 'winexe -A ' + credsfile + ' //' + server_addr + ' "' + remote_iperf + iperf_args + '"'
         rem_loc = 'remote'
@@ -624,12 +628,12 @@ def run_server(protocol, server_addr = False, credsfile = False):
         rem_loc = 'local'
 
     print('Starting ' + rem_loc + ' server...')
-    p = Popen(iperf_command, shell=True)
+    p = Popen(iperf_command + ' > ' + init_name + '_iperf.dat', shell=True)
     sleep(10)
 
 
 def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, credsfile, test_title, protocol, export_dir):
-    series_time = str(timedelta(seconds = 2 * len(p_sizes) * (runtime + 10) + 60))
+    series_time = str(timedelta(seconds = 2 * len(p_sizes) * (runtime + 30) + 20))
     print(time_header() + '\033[92mStarting ' + protocol + ' tests.\033[0m Expected run time: ' + series_time)
     dir_prep(join(export_dir, timestamp + '_' + protocol))
     dir_time = join(export_dir, timestamp + '_' + protocol, protocol + '_' + timestamp)
@@ -653,7 +657,6 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
             image_list = g2h_images
             plot_message = 'Plotting guest --> host summary...'
 
-        run_server(protocol, server_addr, server_creds)
         tot_iperf_mean = -1.0
         iperf_tot = []
         mpstat_tot = []
@@ -664,7 +667,9 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
             mpstat_sumname = dir_time + '_' + direction + '_mpstat_summary'
             combined_sumname = dir_time + '_' + direction + '_summary'
             try:
+                run_server(protocol, p, init_name, server_addr, server_creds)
                 test_completed = run_client(server_addr, runtime, p, queues, init_name, protocol, client_creds)
+                stop_server(server_addr, server_creds)
                 print('Parsing results...')
                 iperf_array, tot_iperf_mean, tot_iperf_stdev = get_iperf_data_single(init_name + '_iperf.dat')
                 iperf_tot.append([ p, tot_iperf_mean, tot_iperf_stdev ])
@@ -678,10 +683,10 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
                 pr = Popen(gnuplot_bin + ' ' + init_name + '.plt', shell=True)
                 pr.wait()
                 image_list.append(init_name.split('/')[-1] + '.png')
-            except:
+            except ValueError as err:
+                print(time_header() + '\033[91mERROR:\033[0m ' + err.args[0] + ' Skipping test...')
                 image_list.append(get_round_size_name(p, gap = True))
 
-        stop_server(server_addr, server_creds)
         if tot_iperf_mean > 0.0:
             print(plot_message)
             np.savetxt(iperf_sumname + '.dat', iperf_tot, fmt='%g', header='PacketSize(b) BW Stdev')
@@ -710,7 +715,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, interrupt_exit)
     # Write message
     if len(protocols) > 1:
-        total_time = str(timedelta(seconds = (2 * len(test_range) * (run_duration + 10) + 60) * len(protocols)))
+        total_time = str(timedelta(seconds = (2 * len(test_range) * (run_duration + 30) + 20) * len(protocols)))
         print(time_header() + '\033[92mStarting tests for protocols: ' + ', '.join(protocols) + '.\033[0m Expected total run time: ' + total_time)
 
     # Run tests
