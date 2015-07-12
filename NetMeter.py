@@ -575,7 +575,7 @@ def run_server(protocol, p_size, init_name, server_addr = False, credsfile = Fal
     sleep(10)
 
 
-def run_client(server_addr, runtime, p_size, queues, init_name, protocol, credsfile = False):
+def run_client(server_addr, runtime, p_size, streams, init_name, protocol, credsfile = False):
     p_size = bend_max_size(p_size, protocol)
     repetitions, mod = divmod(runtime, 10)
     if not mod:
@@ -583,7 +583,7 @@ def run_client(server_addr, runtime, p_size, queues, init_name, protocol, credsf
 
     protocol_opts = set_protocol_opts(protocol)
     iperf_args =  (' -c ' + server_addr + protocol_opts + ' -t ' + str(runtime) + ' -l ' + str(p_size)
-                   + ' -P ' + str(queues))
+                   + ' -P ' + str(streams))
     if credsfile:
         iperf_command = 'winexe -A ' + credsfile + ' //' + remote_addr + ' "' + remote_iperf + iperf_args + '"'
     else:
@@ -632,7 +632,7 @@ def stop_server(server_addr = False, credsfile = False):
     sleep(10)
 
 
-def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, credsfile, test_title, protocol, export_dir):
+def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, credsfile, test_title, protocol, export_dir):
     series_time = str(timedelta(seconds = 2 * len(p_sizes) * (runtime + 30) + 20))
     print(time_header() + '\033[92mStarting ' + protocol + ' tests.\033[0m Expected run time: ' + series_time)
     dir_prep(join(export_dir, timestamp + '_' + protocol))
@@ -668,7 +668,7 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
             combined_sumname = dir_time + '_' + direction + '_summary'
             try:
                 run_server(protocol, p, init_name, server_addr, server_creds)
-                test_completed = run_client(server_addr, runtime, p, queues, init_name, protocol, client_creds)
+                test_completed = run_client(server_addr, runtime, p, streams, init_name, protocol, client_creds)
                 stop_server(server_addr, server_creds)
                 print('Parsing results...')
                 iperf_array, tot_iperf_mean, tot_iperf_stdev = get_iperf_data_single(init_name + '_iperf.dat')
@@ -705,9 +705,9 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, cred
              h2g_images, g2h_images, dir_time + '.html', protocol, all_h2g_failed, all_g2h_failed)
 
 
-def run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, credsfile, test_title, protocols, export_dir):
+def run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, credsfile, test_title, protocols, export_dir):
     for p in protocols:
-        run_tests(remote_addr, local_addr, runtime, p_sizes, queues, timestamp, credsfile, test_title, p, export_dir)
+        run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, credsfile, test_title, p, export_dir)
 
 
 if __name__ == "__main__":
