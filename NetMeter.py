@@ -396,7 +396,11 @@ def get_iperf_data_single(iperf_out, protocol, streams):
     with open(iperf_out, encoding='utf-8', errors='ignore') as inputfile:
         for line in inputfile:
             tmp_lst = line.strip().split(',')
-            if (not tmp_lst[0].isdigit()) or (len(tmp_lst) != (9 + additional_fields)):
+            if (
+                not tmp_lst[0].isdigit()
+                or len(tmp_lst) != (9 + additional_fields)
+                or (additional_fields and float(tmp_lst[-3]) <= 0)
+               ):
                 continue
 
             if (int(tmp_lst[-4 - additional_fields]) > 0):
