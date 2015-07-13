@@ -383,36 +383,49 @@ def get_round_size_name(i, gap = False):
         return str(int(round(float(size_name[0])))) + size_name[1]
 
 
-def get_iperf_data_single(iperf_out):
+def get_iperf_data_single(iperf_out, protocol):
+    '''
+    Notice: all entries are counted from the end, as sometimes the beginning of an
+    output row can be unreadable. This is also the reason for "errors='ignore'".
+    '''
     iperf_data = []
+    additional_fields = 0
+    if protocol == 'UDP':
+        additional_fields = 5
+
     with open(iperf_out, encoding='utf-8', errors='ignore') as inputfile:
         for line in inputfile:
             tmp_lst = line.strip().split(',')
-            if (not tmp_lst[0].isdigit()) or (len(tmp_lst) != 9):
+            if (not tmp_lst[0].isdigit()) or (len(tmp_lst) != (9 + additional_fields)):
                 continue
 
-            if (int(tmp_lst[-4]) > 0):
+            if (int(tmp_lst[-4 - additional_fields]) > 0):
+                # If the link number is positive (i.e if it is not a summary, where it's -1)...
                 date = datetime.strptime(tmp_lst[0], '%Y%m%d%H%M%S')
                 if not iperf_data:
                     first_date = date
 
                 time_from_start = float((date - first_date).total_seconds())
-                rate = float(tmp_lst[-1])
-                if (int(tmp_lst[-2]) < 0) or (rate < 0.0):
+                rate = float(tmp_lst[-1 - additional_fields])
+                if additional_fields:
+                    # For UDP: rate = rate * (total_datagrams - lost_datagrams) / total_datagrams
+                    rate = rate * (float(tmp_lst[-3]) - float(tmp_lst[-4])) / float(tmp_lst[-3])
+
+                if (int(tmp_lst[-2 - additional_fields]) < 0) or (rate < 0.0):
                     rate = np.nan
 
-                iperf_data.append([ time_from_start, int(tmp_lst[-4]), rate ])
+                iperf_data.append([ time_from_start, int(tmp_lst[-4 - additional_fields]), rate ])
 
     iperf_data = np.array(iperf_data)
-    bi_sorted_indices = np.lexsort((iperf_data[:,0], iperf_data[:,1]))
-    iperf_data = iperf_data[bi_sorted_indices]
     num_conn = np.unique(iperf_data[:,1]).shape[0]
-    #print(str(num_conn) + str(iperf_data.shape))
-    # In case test was not complete, and the few last connections data is missing
+    # In case test was not complete, and the few last connections' data is missing
     extra_connections = iperf_data.shape[0] % num_conn
     if extra_connections:
         iperf_data = iperf_data[:-extra_connections]
 
+    bi_sorted_indices = np.lexsort((iperf_data[:,0], iperf_data[:,1]))
+    iperf_data = iperf_data[bi_sorted_indices]
+    #print(str(num_conn) + str(iperf_data.shape))
     iperf_data = iperf_data[:,[0,2]].reshape((num_conn, iperf_data.shape[0]/num_conn, 2))
     iperf_data = np.ma.masked_array(iperf_data, np.isnan(iperf_data))
     #iperf_mean = np.mean(iperf_data, axis=0)
@@ -671,7 +684,7 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
                 test_completed = run_client(server_addr, runtime, p, streams, init_name, protocol, client_creds)
                 stop_server(server_addr, server_creds)
                 print('Parsing results...')
-                iperf_array, tot_iperf_mean, tot_iperf_stdev = get_iperf_data_single(init_name + '_iperf.dat')
+                iperf_array, tot_iperf_mean, tot_iperf_stdev = get_iperf_data_single(init_name + '_iperf.dat', protocol)
                 iperf_tot.append([ p, tot_iperf_mean, tot_iperf_stdev ])
                 mpstat_array, tot_mpstat_mean, tot_mpstat_stdev = get_mpstat_data_single(init_name + '_mpstat.dat')
                 mpstat_tot.append([ p, tot_mpstat_mean, tot_mpstat_stdev ])
