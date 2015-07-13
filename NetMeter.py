@@ -420,6 +420,9 @@ def get_iperf_data_single(iperf_out, protocol, streams):
 
                 iperf_data.append([ time_from_start, int(tmp_lst[-4 - additional_fields]), rate ])
 
+    if not iperf_data:
+        raise ValueError('Nothing reached the server.')
+
     iperf_data = np.array(iperf_data)
     num_conn = np.unique(iperf_data[:,1]).shape[0]
     if num_conn != streams:
