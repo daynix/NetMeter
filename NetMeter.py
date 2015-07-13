@@ -383,7 +383,7 @@ def get_round_size_name(i, gap = False):
         return str(int(round(float(size_name[0])))) + size_name[1]
 
 
-def get_iperf_data_single(iperf_out, protocol):
+def get_iperf_data_single(iperf_out, protocol, streams):
     '''
     Notice: all entries are counted from the end, as sometimes the beginning of an
     output row can be unreadable. This is also the reason for "errors='ignore'".
@@ -418,6 +418,9 @@ def get_iperf_data_single(iperf_out, protocol):
 
     iperf_data = np.array(iperf_data)
     num_conn = np.unique(iperf_data[:,1]).shape[0]
+    if num_conn != streams:
+        raise ValueError(str(num_conn) + ' out of ' + str(streams) + ' streams reached the server.')
+
     # In case test was not complete, and the few last connections' data is missing
     extra_connections = iperf_data.shape[0] % num_conn
     if extra_connections:
@@ -684,7 +687,7 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
                 test_completed = run_client(server_addr, runtime, p, streams, init_name, protocol, client_creds)
                 stop_server(server_addr, server_creds)
                 print('Parsing results...')
-                iperf_array, tot_iperf_mean, tot_iperf_stdev = get_iperf_data_single(init_name + '_iperf.dat', protocol)
+                iperf_array, tot_iperf_mean, tot_iperf_stdev = get_iperf_data_single(init_name + '_iperf.dat', protocol, streams)
                 iperf_tot.append([ p, tot_iperf_mean, tot_iperf_stdev ])
                 mpstat_array, tot_mpstat_mean, tot_mpstat_stdev = get_mpstat_data_single(init_name + '_mpstat.dat')
                 mpstat_tot.append([ p, tot_mpstat_mean, tot_mpstat_stdev ])
