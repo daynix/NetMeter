@@ -524,7 +524,8 @@ def export_single_data(data_processed, data_outname):
 
 
 def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protocol,
-             plot_type = 'singlesize', direction = 'h2g', finished = True, packet_size = 0.0):
+             plot_type = 'singlesize', direction = 'h2g', finished = True,
+             server_fault = False, packet_size = 0.0):
     try:
         net_rate, rate_units, rate_factor = get_size_units_factor(net_rate, rate=True)
         rate_format = ''
@@ -556,10 +557,13 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
     else:
         plot_subtitle = 'Guest to Host'
 
-    if finished:
-        warning_message = ''
-    else:
+    warning_message = ''
+    if not finished:
         warning_message = 'set label "Warning:\\nTest failed to finish!\\nThe results are partial!" at screen 0.01, screen 0.96 tc rgb "red"\n'
+    elif server_fault == 'too_few':
+        warning_message = 'set label "Warning:\\nToo few connections!\\nResults may not be accurate!" at screen 0.01, screen 0.96 tc rgb "red"\n'
+    elif server_fault == 'too_many':
+        warning_message = 'set label "Warning:\\nToo many connections!\\nResults may not be accurate!" at screen 0.01, screen 0.96 tc rgb "red"\n'
 
     content = (
                'set terminal pngcairo nocrop enhanced size 1024,768 font "Verdana,15"\n'
@@ -729,13 +733,19 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
                 print('Parsing results...')
                 iperf_array, tot_iperf_mean, tot_iperf_stdev, server_fault = get_iperf_data_single(init_name + '_iperf.dat', protocol,
                                                                                                    streams, repetitions)
+                if server_fault == 'too_few':
+                    print('\033[93mWARNING:\033[0m The server received fewer connections than expected.')
+                elif server_fault == 'too_many':
+                    print('\033[93mWARNING:\033[0m The server received more connections than expected.')
+
                 iperf_tot.append([ p, tot_iperf_mean, tot_iperf_stdev ])
                 mpstat_array, tot_mpstat_mean, tot_mpstat_stdev = get_mpstat_data_single(init_name + '_mpstat.dat')
                 mpstat_tot.append([ p, tot_mpstat_mean, tot_mpstat_stdev ])
                 export_single_data(iperf_array, init_name + '_iperf_processed.dat')
                 export_single_data(mpstat_array, init_name + '_mpstat_processed.dat')
                 write_gp(init_name + '.plt', init_name + '_iperf_processed.dat', init_name + '_mpstat_processed.dat', init_name + '.png',
-                         tot_iperf_mean, protocol, plot_type = 'singlesize', direction = direction, finished = test_completed, packet_size = p)
+                         tot_iperf_mean, protocol, plot_type = 'singlesize', direction = direction, finished = test_completed,
+                         server_fault = server_fault, packet_size = p)
                 print('Plotting...')
                 pr = Popen(gnuplot_bin + ' ' + init_name + '.plt', shell=True)
                 pr.wait()
