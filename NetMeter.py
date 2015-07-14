@@ -433,6 +433,7 @@ def get_iperf_data_single(iperf_out, protocol, streams):
     if extra_connections:
         iperf_data = iperf_data[:-extra_connections]
 
+    # Sort by connection number, then by date. Get indices of the result.
     bi_sorted_indices = np.lexsort((iperf_data[:,0], iperf_data[:,1]))
     iperf_data = iperf_data[bi_sorted_indices]
     #print(str(num_conn) + str(iperf_data.shape))
