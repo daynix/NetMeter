@@ -383,7 +383,7 @@ def get_round_size_name(i, gap = False):
         return str(int(round(float(size_name[0])))) + size_name[1]
 
 
-def get_iperf_data_single(iperf_out, protocol, streams):
+def get_iperf_data_single(iperf_out, protocol, streams, repetitions):
     '''
     Notice: all entries are counted from the end, as sometimes the beginning of an
     output row can be unreadable. This is also the reason for "errors='ignore'".
@@ -424,18 +424,50 @@ def get_iperf_data_single(iperf_out, protocol, streams):
         raise ValueError('Nothing reached the server.')
 
     iperf_data = np.array(iperf_data)
-    num_conn = np.unique(iperf_data[:,1]).shape[0]
+    conns = np.unique(iperf_data[:,1])
+    num_conn = conns.shape[0]
     if num_conn != streams:
         raise ValueError(str(num_conn) + ' out of ' + str(streams) + ' streams reached the server.')
-
-    # In case test was not complete, and the few last connections' data is missing
-    extra_connections = iperf_data.shape[0] % num_conn
-    if extra_connections:
-        iperf_data = iperf_data[:-extra_connections]
 
     # Sort by connection number, then by date. Get indices of the result.
     bi_sorted_indices = np.lexsort((iperf_data[:,0], iperf_data[:,1]))
     iperf_data = iperf_data[bi_sorted_indices]
+    ### Mechanism to check if too few or too many connections received
+    # Get the index of the line after the last of each connection
+    conn_ranges = np.searchsorted(iperf_data[:,1], conns, side='right')
+    # Get sizes of connection blocks
+    conn_count = np.diff(np.insert(conn_ranges, 0, 0))
+    server_fault = False
+    conn_reached = conn_count.min()
+    if conn_reached < repetitions:
+        # If there was at least one occasion when there were fewer connections than expected
+        server_fault = 'too_few'
+        repetitions = conn_reached
+
+    # Get indices of connection block sizes that are bigger than expected (if any)
+    where_extra_conn = (conn_count > repetitions).nonzero()[0]
+    if where_extra_conn.size:
+        ## If there were connection blocks bigger than expected
+        # Get indices of lines after the last (n+1) for removal
+        remove_before_lines = conn_ranges[where_extra_conn]
+        # Get the amount of extra lines
+        amount_lines_to_remove = [remove_before_lines[0] - repetitions * (where_extra_conn[0] + 1)]
+        for i in where_extra_conn[1:]:
+            amount_lines_to_remove.append(conn_ranges[i] - repetitions * (i + 1) - sum(amount_lines_to_remove))
+
+        # Get the first lines to remove
+        first_for_removal = remove_before_lines - amount_lines_to_remove
+        # Get the ranges of lines to remove
+        lines_to_remove = np.array([
+                                    np.arange(first_for_removal[i],remove_before_lines[i])
+                                    for i in np.arange(first_for_removal.size)
+                                   ]).flatten()
+        # Remove the extra lines
+        iperf_data = np.delete(iperf_data, lines_to_remove, axis=0)
+        if not server_fault:
+            server_fault = 'too_many'
+
+    ### End connection ammount check
     #print(str(num_conn) + str(iperf_data.shape))
     iperf_data = iperf_data[:,[0,2]].reshape((num_conn, iperf_data.shape[0]/num_conn, 2))
     iperf_data = np.ma.masked_array(iperf_data, np.isnan(iperf_data))
@@ -447,7 +479,7 @@ def get_iperf_data_single(iperf_out, protocol, streams):
     iperf_stdev = np.std(iperf_data[:,:,1], axis=0) * np.sqrt(num_conn)
     #return np.hstack((iperf_mean,iperf_stdev)).filled(np.nan)
     out_arr = np.vstack((mean_times, iperf_data[:,:,1].sum(axis=0), iperf_stdev)).filled(np.nan).T
-    return out_arr, out_arr[:,1].mean(), out_arr[:,1].std()
+    return out_arr, out_arr[:,1].mean(), out_arr[:,1].std(), server_fault
 
 
 def get_mpstat_data_single(mpstat_out):
@@ -636,11 +668,11 @@ def run_client(server_addr, runtime, p_size, streams, init_name, protocol, creds
     if not iperf_proc.poll():
         print(time_header() + '\033[92mThe ' + size_name + ' test finished.\033[0m Waiting for 10 seconds.')
         sleep(10)
-        return True
+        return True, repetitions
     else:
         print(time_header() + '\033[91mThe Iperf test failed to finish.\033[0m Skipping in 10 seconds.')
         sleep(10)
-        return False
+        return False, repetitions
 
 
 def stop_server(server_addr = False, credsfile = False):
@@ -692,10 +724,11 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
             combined_sumname = dir_time + '_' + direction + '_summary'
             try:
                 run_server(protocol, p, init_name, server_addr, server_creds)
-                test_completed = run_client(server_addr, runtime, p, streams, init_name, protocol, client_creds)
+                test_completed, repetitions = run_client(server_addr, runtime, p, streams, init_name, protocol, client_creds)
                 stop_server(server_addr, server_creds)
                 print('Parsing results...')
-                iperf_array, tot_iperf_mean, tot_iperf_stdev = get_iperf_data_single(init_name + '_iperf.dat', protocol, streams)
+                iperf_array, tot_iperf_mean, tot_iperf_stdev, server_fault = get_iperf_data_single(init_name + '_iperf.dat', protocol,
+                                                                                                   streams, repetitions)
                 iperf_tot.append([ p, tot_iperf_mean, tot_iperf_stdev ])
                 mpstat_array, tot_mpstat_mean, tot_mpstat_stdev = get_mpstat_data_single(init_name + '_mpstat.dat')
                 mpstat_tot.append([ p, tot_mpstat_mean, tot_mpstat_stdev ])
