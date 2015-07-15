@@ -74,6 +74,11 @@ creds = 'creds.dat'
 # Example: 'Some Informative Title'
 title = 'Test Results (5 min per run)'
 
+# Enable debugging mode?
+# In the debugging mode the underlying Iperf commands will be presented. [bool]
+# Exanple: True
+debug = False
+
 ### End editable parameters ###
 ###############################
 
@@ -221,6 +226,22 @@ def dir_prep(d):
             sys.exit(1)
     
     print('The output directory is set to: \033[93m' + d + '\033[0m')
+
+
+def debug_print(text_list):
+    '''
+    Notice: for compatibility, only lists are accepted as arguments!
+    '''
+    if debug:
+        print_list = text_list[:]
+        if print_list[0] == 'winexe':
+            # So that the passed command would be quoted, as it is actually passed this way.
+            print_list[-1] = '"' + print_list[-1] + '"'
+
+        print('####### Debug mode on #######\n' +
+              'Command:\n' +
+              ' '.join(print_list) + '\n' +
+              '#############################')
 
 
 def place_images(direction, protocol, summary_img, image_list, all_failed = False):
@@ -631,6 +652,7 @@ def run_server(protocol, p_size, init_name, server_addr = False, credsfile = Fal
         rem_loc = 'local'
 
     print('Starting ' + rem_loc + ' server...')
+    debug_print([iperf_command])
     p = Popen(iperf_command + ' > ' + init_name + '_iperf.dat', shell=True)
     sleep(10)
 
@@ -655,6 +677,7 @@ def run_client(server_addr, runtime, p_size, streams, init_name, protocol, creds
     size_name = get_round_size_name(p_size)
     print(time_header() + 'Running ' + size_name + ' ' + direction_message + ' test. (Duration: '
           + str(timedelta(seconds = repetitions * 10 + mod)) + ')')
+    debug_print(iperf_command)
     iperf_proc = Popen(iperf_command)
     mpstat_proc = Popen('mpstat -P ALL 10 ' + str(repetitions) + ' > ' + init_name + '_mpstat.dat', shell=True)
     mpstat_proc.wait()
@@ -688,6 +711,7 @@ def stop_server(server_addr = False, credsfile = False):
         rem_loc = 'local'
 
     print('Stopping previous ' + rem_loc  + ' server instances...')
+    debug_print(iperf_stop_command)
     p = Popen(iperf_stop_command, stdout=PIPE, stderr=PIPE)
     p.wait()
     out, err = p.communicate()
