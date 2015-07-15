@@ -693,6 +693,7 @@ def stop_server(server_addr = False, credsfile = False):
     out, err = p.communicate()
     if 'found' in str(err):
         print('None were running.')
+        return
     elif (out or err):
         print(((out + err).strip()).decode('ascii', errors='ignore'))
 
