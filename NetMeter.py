@@ -652,15 +652,11 @@ def run_client(server_addr, runtime, p_size, streams, init_name, protocol, creds
         iperf_command.extend(iperf_args.split())
         direction_message = 'host to guest'
 
-    commands = [
-                iperf_command,
-                'mpstat -P ALL 10 ' + str(repetitions) + ' > ' + init_name + '_mpstat.dat',
-               ]
     size_name = get_round_size_name(p_size)
     print(time_header() + 'Running ' + size_name + ' ' + direction_message + ' test. (Duration: '
           + str(timedelta(seconds = repetitions * 10 + mod)) + ')')
-    iperf_proc = Popen(commands[0])
-    mpstat_proc = Popen(commands[1], shell=True)
+    iperf_proc = Popen(iperf_command)
+    mpstat_proc = Popen('mpstat -P ALL 10 ' + str(repetitions) + ' > ' + init_name + '_mpstat.dat', shell=True)
     mpstat_proc.wait()
     waitcount = 0
     while iperf_proc.poll() == None:
