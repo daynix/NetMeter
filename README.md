@@ -31,18 +31,18 @@ In order to run the NetMeter one needs:
 For now, all the options are set at the beginning of the script file. They are all mandatory.  
 These options are:
 
-* `export_dir`: [string] Export directory. The results will be saved there (example: `'/home/daynix/out'`).
-* `remote_addr`: [string] IP of the guest (example: `'10.0.1.114'`).
-* `local_addr`: [string] Ip of the host, which the guest can connect to (example: `'10.0.0.157'`).
-* `remote_iperf`: [raw string] Path to the Iperf executable on the guest (example: `r'C:\iperf\iperf.exe'`).
+* `export_dir`: [string] Export directory. The results will be saved there. (Example: `'/home/daynix/out'`)
+* `remote_addr`: [string] IP of the guest. (Example: `'10.0.1.114'`)
+* `local_addr`: [string] Ip of the host, which the guest can connect to. (Example: `'10.0.0.157'`)
+* `remote_iperf`: [raw string] Path to the Iperf executable on the guest. (Example: `r'C:\iperf\iperf.exe'`)
 * `local_iperf`: [string] Path to the Iperf executable on the host (local). (Example: `'iperf'`)
 * `gnuplot_bin`: [string] Path to the gnuplot executable on the host (local). (Example: `'gnuplot'`)
 * `test_range`: [iterable] A list of packet sizes to test (preferably as powers of 2). (Example: `[2**x for x in range(5,17)]` - for sizes of  32B to 64KB)
-* `run_duration`: [int] The duration of a single run, in seconds. Must be at least 20, preferable at least 120 (example: `300`).
-* `streams`: [int] The desired number of streams (example: `1`).
+* `run_duration`: [int] The duration of a single run, in seconds. Must be at least 20, preferable at least 120. (Example: `300`)
+* `streams`: [int] The desired number of streams. (Example: `1`)
 * `protocols`: [iterable] The desired protocol(s). The value MUST be one of 3 possibilities: `['TCP']` | `['UDP']` | `['TCP', 'UDP']`.
 * `creds`: [string] A path to the credentials file for Windows access, which consists of three lines: `username=<USERNAME>`, `password=<PASSWORD>`, and `domain=<DOMAIN>`. (Example: `'creds.dat'`)
-* `title`: [string] A title for the test. Needs to be short and informative, appears as the title of the output html page. For the page to look good, the title needs to be no longer than 80 characters. (example: `'Some Informative Title'`)
+* `title`: [string] A title for the test. Needs to be short and informative, appears as the title of the output html page. For the page to look good, the title needs to be no longer than 80 characters. (Example: `'Some Informative Title'`)
 * `debug`: [boolean] Turn the debugging mode on or off. In the debugging mode all Iperf commands executed will be shown. (Example: `True`)
 
 ## Running:
