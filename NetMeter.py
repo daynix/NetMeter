@@ -759,6 +759,7 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
             mpstat_sumname = dir_time + '_' + direction + '_mpstat_summary'
             combined_sumname = dir_time + '_' + direction + '_summary'
             try:
+                print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
                 run_server(protocol, p, init_name, server_addr, server_creds)
                 test_completed, repetitions = run_client(server_addr, runtime, p, streams, init_name, protocol, client_creds)
                 stop_server(server_addr, server_creds)
@@ -782,9 +783,11 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
                 pr = Popen([gnuplot_bin, init_name + '.plt'])
                 pr.wait()
                 image_list.append(init_name.split('/')[-1] + '.png')
+                print('============================================================')
             except ValueError as err:
                 print(time_header() + '\033[91mERROR:\033[0m ' + err.args[0] + ' Skipping test...')
                 image_list.append(get_round_size_name(p, gap = True))
+                print('============================================================')
 
         if tot_iperf_mean > 0.0:
             print(plot_message)
