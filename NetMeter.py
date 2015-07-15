@@ -646,16 +646,18 @@ def run_client(server_addr, runtime, p_size, streams, init_name, protocol, creds
                    + ' -P ' + str(streams))
     if credsfile:
         iperf_command = ['winexe', '-A',  credsfile, '//' + remote_addr, remote_iperf + iperf_args]
+        direction_message = 'guest to host'
     else:
         iperf_command = [local_iperf]
         iperf_command.extend(iperf_args.split())
+        direction_message = 'host to guest'
 
     commands = [
                 iperf_command,
                 'mpstat -P ALL 10 ' + str(repetitions) + ' > ' + init_name + '_mpstat.dat',
                ]
     size_name = get_round_size_name(p_size)
-    print(time_header() + 'Running ' + size_name + ' test. (Duration: '
+    print(time_header() + 'Running ' + size_name + ' ' + direction_message + ' test. (Duration: '
           + str(timedelta(seconds = repetitions * 10 + mod)) + ')')
     iperf_proc = Popen(commands[0])
     mpstat_proc = Popen(commands[1], shell=True)
