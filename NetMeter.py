@@ -645,9 +645,10 @@ def run_client(server_addr, runtime, p_size, streams, init_name, protocol, creds
     iperf_args =  (' -c ' + server_addr + protocol_opts + ' -t ' + str(runtime) + ' -l ' + str(p_size)
                    + ' -P ' + str(streams))
     if credsfile:
-        iperf_command = 'winexe -A ' + credsfile + ' //' + remote_addr + ' "' + remote_iperf + iperf_args + '"'
+        iperf_command = ['winexe', '-A',  credsfile, '//' + remote_addr, remote_iperf + iperf_args]
     else:
-        iperf_command = local_iperf + iperf_args
+        iperf_command = [local_iperf]
+        iperf_command.extend(iperf_args.split())
 
     commands = [
                 iperf_command,
@@ -656,7 +657,7 @@ def run_client(server_addr, runtime, p_size, streams, init_name, protocol, creds
     size_name = get_round_size_name(p_size)
     print(time_header() + 'Running ' + size_name + ' test. (Duration: '
           + str(timedelta(seconds = repetitions * 10 + mod)) + ')')
-    iperf_proc = Popen(commands[0], shell=True)
+    iperf_proc = Popen(commands[0])
     mpstat_proc = Popen(commands[1], shell=True)
     mpstat_proc.wait()
     waitcount = 0
@@ -755,7 +756,7 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
                          tot_iperf_mean, protocol, plot_type = 'singlesize', direction = direction, finished = test_completed,
                          server_fault = server_fault, packet_size = p)
                 print('Plotting...')
-                pr = Popen(gnuplot_bin + ' ' + init_name + '.plt', shell=True)
+                pr = Popen([gnuplot_bin, init_name + '.plt'])
                 pr.wait()
                 image_list.append(init_name.split('/')[-1] + '.png')
             except ValueError as err:
@@ -768,7 +769,7 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
             np.savetxt(mpstat_sumname + '.dat', mpstat_tot, fmt='%g', header='PacketSize(b) Frac Stdev')
             write_gp(combined_sumname + '.plt', iperf_sumname + '.dat', mpstat_sumname + '.dat', combined_sumname + '.png',
                      tot_iperf_mean, protocol, plot_type = 'multisize', direction = direction, packet_size = np.mean(p_sizes))
-            pr = Popen(gnuplot_bin + ' ' + combined_sumname + '.plt', shell=True)
+            pr = Popen([gnuplot_bin, combined_sumname + '.plt'])
             pr.wait()
         elif direction == 'h2g':
             all_h2g_failed = True
