@@ -15,7 +15,7 @@ import sys
 import signal
 from datetime import datetime, timedelta
 from time import sleep
-from subprocess import Popen
+from subprocess import Popen, PIPE
 from os import makedirs
 from os.path import isdir, join
 
@@ -681,14 +681,21 @@ def run_client(server_addr, runtime, p_size, streams, init_name, protocol, creds
 
 def stop_server(server_addr = False, credsfile = False):
     if credsfile:
-        iperf_stop_command = 'winexe -A ' + credsfile + ' //' + server_addr + ' "taskkill /im ' + remote_iperf.split('\\')[-1] + ' /f"'
-        print('Stopping previous remote server instances... \033[92m[Please ignore an ERROR message if present in the line below]\033[0m')
+        iperf_stop_command = ['winexe', '-A', credsfile, '//' + server_addr, 'taskkill /im ' + remote_iperf.split('\\')[-1] + ' /f']
+        rem_loc = 'remote'
     else:
-        iperf_stop_command = 'killall -9 ' + local_iperf
-        print('Stopping previous local server instances...')
+        iperf_stop_command = ['killall', '-9', local_iperf]
+        rem_loc = 'local'
 
-    p = Popen(iperf_stop_command, shell=True)
+    print('Stopping previous ' + rem_loc  + ' server instances...')
+    p = Popen(iperf_stop_command, stdout=PIPE, stderr=PIPE)
     p.wait()
+    out, err = p.communicate()
+    if 'found' in str(err):
+        print('None were running.')
+    elif (out or err):
+        print(((out + err).strip()).decode('ascii', errors='ignore'))
+
     sleep(10)
 
 
