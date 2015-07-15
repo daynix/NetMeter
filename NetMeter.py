@@ -658,12 +658,13 @@ def run_client(server_addr, runtime, p_size, streams, init_name, protocol, creds
     iperf_proc = Popen(iperf_command)
     mpstat_proc = Popen('mpstat -P ALL 10 ' + str(repetitions) + ' > ' + init_name + '_mpstat.dat', shell=True)
     mpstat_proc.wait()
-    waitcount = 0
+    waitcount = 1  # Positive integer. Number of 10 sec intervals to wait for the client to finish.
     while iperf_proc.poll() == None:
-        if waitcount < 1:
+        # iperf_proc.poll() may be "False" or "None". Here we want "None" specifically, thus "not iperf_proc.poll()" won't work.
+        if waitcount:
             print(time_header() + '\033[93mThe Iperf test is not over yet.\033[0m Waiting for 10 more seconds...')
             sleep(10)
-            waitcount += 1
+            waitcount -= 1
         else:
             iperf_proc.kill()
             sleep(2)
