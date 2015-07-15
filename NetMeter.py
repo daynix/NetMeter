@@ -253,11 +253,11 @@ def place_images(direction, protocol, summary_img, image_list, all_failed = Fals
         to_dev = 'Host'
 
     content = (
-                '    <div id=' + direction + '>\n'
-                '        <h1>' + from_dev + ' &#8594; ' + to_dev + ' Results</h1>\n'
-                '        <hr>\n'
-                '        <h2>By Packet Size</h2>\n'
-                )
+               '    <div id=' + direction + '>\n'
+               '        <h1>' + from_dev + ' &#8594; ' + to_dev + ' Results</h1>\n'
+               '        <hr>\n'
+               '        <h2>By Packet Size</h2>\n'
+               )
     if all_failed:
         content += (
                     '        <div id="missing"><div></br></br>'
