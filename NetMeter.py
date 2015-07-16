@@ -18,6 +18,7 @@ from time import sleep
 from subprocess import Popen, PIPE
 from os import makedirs
 from os.path import isdir, join
+from ntpath import dirname, basename
 
 ##############################
 ##### Parameters to edit #####
@@ -751,7 +752,7 @@ def run_client(server_addr, runtime, p_size, streams, init_name, protocol, creds
 
 def stop_server(server_addr = False, credsfile = False):
     if credsfile:
-        iperf_stop_command = ['winexe', '-A', credsfile, '//' + server_addr, 'taskkill /im ' + remote_iperf.split('\\')[-1] + ' /f']
+        iperf_stop_command = ['winexe', '-A', credsfile, '//' + server_addr, 'taskkill /im ' + basename(remote_iperf) + ' /f']
         rem_loc = 'remote'
     else:
         iperf_stop_command = ['killall', '-9', local_iperf]
@@ -829,7 +830,7 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
                 print('Plotting...')
                 pr = Popen([gnuplot_bin, init_name + '.plt'])
                 pr.wait()
-                image_list.append(init_name.split('/')[-1] + '.png')
+                image_list.append(basename(init_name + '.png'))
                 print('============================================================')
             except ValueError as err:
                 print(time_header() + '\033[91mERROR:\033[0m ' + err.args[0] + ' Skipping test...')
