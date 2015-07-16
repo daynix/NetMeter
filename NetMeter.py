@@ -217,6 +217,13 @@ def interrupt_exit(signal, frame):
     sys.exit(1)
 
 
+def yes_and_no(y, n):
+    if y and (not n):
+        return 1
+    else:
+        return 0
+
+
 def dir_prep(d):
     if not isdir(d):
         try:
@@ -544,6 +551,51 @@ def export_single_data(data_processed, data_outname):
     np.savetxt(data_outname, data_processed, fmt='%g', header='TimeStamp(s) Sum Stdev')
 
 
+def plot_iperf_data(rate_factor, passed, plot_type, net_dat_file):
+    '''
+    Get different types of plots for the following cases:
+    1. Single size plot.
+    2. Multi size plot where all tests passed OK.
+    3. Multi size plot where some tests had problems.
+    4. Multi size plot where all tests had problems.
+    ---
+    rate_factor - the factor by which the rate should be divided
+    passed - Numpy array, with 1 if a test went correctly, and 0 otherwise
+    plot_type - 'singlesize' or 'multisize'
+    net_dat_file - the file with PROCESSED Ipref data
+    '''
+    x_column = ['1', '2', '2', '2']
+    condition_statement = ['', '', '$1 != 0 ? ', '$1 == 0 ? ']
+    BW_column = ['2', '3', '3', '3']
+    if_not_condition = ['', '', ' : 1/0', ' : 1/0']
+    xtic_explicit = ':xtic($2 < 1024.0 ? sprintf("%.0fB", $2) : ($2 < 1048576.0 ? sprintf("%.0fKB", $2/1024.0) : sprintf("%.0fMB", $2/1048576.0)))'
+    xtic = ['', xtic_explicit, '', xtic_explicit]
+    point_color = ['blue', 'blue', 'blue', 'magenta']
+    title = ['Mean tot. BW', 'Mean tot. BW', 'Mean tot. BW', 'Approx. BW']
+    initial_points = (
+                      '     "" using {0}:({1}${2}/' + rate_factor + '{3}){4} with points'
+                            ' pt 2 ps 1.5 lw 3 lc rgb "{5}" title "{6}", \\\n'
+                     )
+    for_all_points = [initial_points.format(x_column[i], condition_statement[i], BW_column[i], if_not_condition[i],
+                                            xtic[i], point_color[i], title[i])
+                      for i in [0, 1, 2, 3]]
+    std_column = ['3', '4']
+    initial_areas = (
+                     '"' + net_dat_file + '" using {0}:(${1}/' + rate_factor + '-${2}/' + rate_factor + '):'
+                     '(${1}/' + rate_factor + '+${2}/' + rate_factor + ') with filledcurves lc rgb "blue" notitle, \\\n'
+                    )
+    for_all_areas = [initial_areas.format(x_column[i], BW_column[i], std_column[i])
+                     for i in [0, 1]]
+    if plot_type == 'singlesize':
+        return for_all_areas[0] + for_all_points[0]
+    elif passed.all():
+        return for_all_areas[1] + for_all_points[1]
+    elif passed.any():
+        return for_all_areas[1] + for_all_points[2] + for_all_points[3]
+    else:
+        return for_all_areas[1] + for_all_points[3]
+
+
 def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protocol,
              plot_type = 'singlesize', direction = 'h2g', finished = True,
              server_fault = False, packet_size = 0.0):
@@ -560,16 +612,14 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
     if plot_type == 'singlesize':
         plot_title = 'Packet size: ' + packet_size + ', Av. rate: ' + net_rate + ' ' + rate_units
         x_title = 'Time (s)'
-        xtic_explicit = ''
         labels_above_points = ''
         log2_scale = ''
         rotate_xtics = ''
     else:
         plot_title = 'Bandwidth \\\\& CPU usage for different packet sizes'
         x_title = 'Packet size'
-        xtic_explicit = ':xtic($1 < 1024.0 ? sprintf("%.0fB", $1) : ($1 < 1048576.0 ? sprintf("%.0fKB", $1/1024.0) : sprintf("%.0fMB", $1/1048576.0)))'
-        labels_above_points = ('     "" using 1:($2/' + rate_factor + '):(sprintf("%.2f ' + rate_units + '",'
-                               ' $2/' + rate_factor + ')) with labels offset 0.9,1.0 rotate by 90 font ",12" notitle, \\\n')
+        labels_above_points = ('     "" using 2:($3/' + rate_factor + '):(sprintf("%.2f ' + rate_units + '",'
+                               ' $3/' + rate_factor + ')) with labels offset 0.9,1.0 rotate by 90 font ",12" notitle, \\\n')
         log2_scale = 'set logscale x 2\n'
         rotate_xtics = 'set xtics rotate by -30\n'
 
@@ -586,6 +636,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
     elif server_fault == 'too_many':
         warning_message = 'set label "Warning:\\nToo many connections!\\nResults may not be accurate!" at screen 0.01, screen 0.96 tc rgb "red"\n'
 
+    plot_net_data = plot_iperf_data(rate_factor, server_fault, plot_type, net_dat_file)
     content = (
                'set terminal pngcairo nocrop enhanced size 1024,768 font "Verdana,15"\n'
                'set output "' + img_file +'"\n'
@@ -604,11 +655,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
                + log2_scale + rotate_xtics +
                '\n'
                'set style fill transparent solid 0.2 noborder\n'
-               'plot "' + net_dat_file + '" using 1:($2/' + rate_factor + '-$3/' + rate_factor + '):'
-                     '($2/' + rate_factor + '+$3/' + rate_factor + ') with filledcurves lc rgb "blue" notitle, \\\n'
-               '     "" using 1:($2/' + rate_factor + ')' + xtic_explicit + ' with points'
-                     ' pt 2 ps 1.5 lw 3 lc rgb "blue" title "Mean tot. BW", \\\n'
-               + labels_above_points +
+               'plot ' + plot_net_data + labels_above_points +
                '     "' + proc_dat_file + '" using 1:($2-$3):($2+$3) with filledcurves lc rgb "red" axes x1y2 notitle, \\\n'
                '     "" using 1:2 with points pt 1 ps 1.5 lw 3 lc rgb "red" axes x1y2 title "Mean tot. CPU"\n'
               )
@@ -771,7 +818,7 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
                 elif server_fault == 'too_many':
                     print('\033[93mWARNING:\033[0m The server received more connections than expected.')
 
-                iperf_tot.append([ p, tot_iperf_mean, tot_iperf_stdev ])
+                iperf_tot.append([ yes_and_no(test_completed, server_fault), p, tot_iperf_mean, tot_iperf_stdev ])
                 mpstat_array, tot_mpstat_mean, tot_mpstat_stdev = get_mpstat_data_single(init_name + '_mpstat.dat')
                 mpstat_tot.append([ p, tot_mpstat_mean, tot_mpstat_stdev ])
                 export_single_data(iperf_array, init_name + '_iperf_processed.dat')
@@ -791,10 +838,11 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
 
         if tot_iperf_mean > 0.0:
             print(plot_message)
-            np.savetxt(iperf_sumname + '.dat', iperf_tot, fmt='%g', header='PacketSize(b) BW Stdev')
+            np.savetxt(iperf_sumname + '.dat', iperf_tot, fmt='%g', header='TestOK PacketSize(b) BW Stdev')
             np.savetxt(mpstat_sumname + '.dat', mpstat_tot, fmt='%g', header='PacketSize(b) Frac Stdev')
             write_gp(combined_sumname + '.plt', iperf_sumname + '.dat', mpstat_sumname + '.dat', combined_sumname + '.png',
-                     tot_iperf_mean, protocol, plot_type = 'multisize', direction = direction, packet_size = np.mean(p_sizes))
+                     tot_iperf_mean, protocol, plot_type = 'multisize', direction = direction,
+                     server_fault = np.array(iperf_tot)[:,0], packet_size = np.mean(p_sizes))
             pr = Popen([gnuplot_bin, combined_sumname + '.plt'])
             pr.wait()
         elif direction == 'h2g':
