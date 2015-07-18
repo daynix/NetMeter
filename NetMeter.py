@@ -75,6 +75,11 @@ creds = 'creds.dat'
 # Example: 'Some Informative Title'
 title = 'Test Results (5 min per run)'
 
+# Shut down the the guest when all tests are over?
+# This is useful when doing long/overnight tests. [bool]
+# Exanple: True
+shutdown = True
+
 # Enable debugging mode?
 # In the debugging mode the underlying Iperf commands will be presented. [bool]
 # Exanple: True
@@ -897,3 +902,9 @@ if __name__ == "__main__":
 
     # Run tests
     run_tests_for_streams(remote_addr, local_addr, run_duration, test_range, streams, rundate, creds, title, protocols, export_dir)
+    # Shut down the guest if needed
+    if shutdown:
+        print('Shutting down the guest...')
+        p = Popen(['winexe', '-A', creds, '//' + remote_addr, 'shutdown /t 10 /s /f'])
+        p.wait()
+        sleep(10)
