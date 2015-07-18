@@ -2,16 +2,11 @@
 
 ## Summary
 
-To automate the Iperf testing procedures and to present the test results graphically, in easily understandable format, the NetMeter script can be used. It has the functionality of performing Iperf tests between a host and a guest (in both directions) with different packet sizes, varying amount of streams, and varying test times. The results are reported on an html page with a clear graphical representation. Besides the graphs, all the data files (raw and processed) and the scripts that are used to draw the plots are saved. This is done so that, for example, a need for modifications in one of the tests or plots will not require performing an entire run again, but rather the modification of a single text file. The script is also aware of the Iperf freezes, that are quite common in certain scenarios (small packet sizes on fast networks, for example).
+To automate the Iperf testing procedures between a virtual machine and its host, and to present the test results graphically, in easily understandable format, the NetMeter script can be used. It has the functionality of performing Iperf tests between a host and a guest (in both directions) with different packet sizes, varying amount of streams, and varying test times. The results are reported on an html page with a clear graphical representation. Besides the graphs, all the data files (raw and processed) and the scripts that are used to draw the plots are saved. This is done so that, for example, a need for modifications in one of the tests or plots will not require performing an entire run again, but rather the modification of a single text file. NetMeter is also aware of Iperf malfunctions, which are quite common in certain scenarios.
 
-Being in the initial stages of development, this script is still missing some features.  
-To name a few:
+Because all the data and the plot-drawing scripts are preserved and can be changed manually or by scripting, NetMeter can also be used in other scenarios than those for which it was written.
 
-* Sanity check for the arguments: practically no checks for the correctness of the arguments are performed.
-* Code elegance - there are few repeating code blocks here and there.
-* Early Iperf freeze awareness: currently a wait equal to a single test duration is required in order to detect a freeze.
-
-In the longer run, some flexibility may be added, to allow more kinds of tests and test scenarios.
+Being in the initial stages of development, NetMeter is still missing some features. Currently, it works only between a host Linux machine, and a Windows guest. In the longer run, it should also be able to measure the bandwidth between two guests, and the guests may run Windows or Linux.
 
 ## Prerequisites:
 
@@ -21,10 +16,10 @@ In order to run the NetMeter one needs:
  * Python 3
  * Numpy (for Python 3)
  * Winexe
- * Iperf 2 (_IMPORTANT_: Version 2.0.5 or later, _i.e._ the **latest** version!)
+ * Iperf 2 (_IMPORTANT_: Version 2.0.8 or later, _i.e._ the **latest** version!)
  * gnuplot
 * On the guest:
- * Iperf 2 (**The latest version as well**! Windows builds can be obtained from https://iperf.fr)
+ * Iperf 2 (**The latest version as well**! Windows builds can be obtained from http://sourceforge.net/projects/iperf2/files)
 
 ## Options:
 
