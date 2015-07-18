@@ -853,8 +853,8 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
 
         if tot_iperf_mean > 0.0:
             print(plot_message)
-            np.savetxt(iperf_sumname + '.dat', iperf_tot, fmt='%g', header= 'TestOK ' + print_unit + 'Size(b) BW(b/s) Stdev(b/s) BW(' + rate_units + ')')
-            np.savetxt(mpstat_sumname + '.dat', mpstat_tot, fmt='%g', header= print_unit + 'Size(b) Frac Stdev')
+            np.savetxt(iperf_sumname + '.dat', iperf_tot, fmt='%g', header= 'TestOK ' + print_unit + 'Size(B) BW(b/s) Stdev(b/s) BW(' + rate_units + ')')
+            np.savetxt(mpstat_sumname + '.dat', mpstat_tot, fmt='%g', header= print_unit + 'Size(B) Frac Stdev')
             write_gp(combined_sumname + '.plt', basename(iperf_sumname + '.dat'),
                      basename(mpstat_sumname + '.dat'), basename(combined_sumname + '.png'),
                      tot_iperf_mean, protocol, streams, print_unit, plot_type = 'multisize', direction = direction,
