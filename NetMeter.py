@@ -823,7 +823,16 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
                 elif server_fault == 'too_many':
                     print('\033[93mWARNING:\033[0m The server received more connections than expected.')
 
-                iperf_tot.append([ yes_and_no(test_completed, server_fault), p, tot_iperf_mean, tot_iperf_stdev ])
+                # Get the "humanly readable" rate and its units.
+                # This is just to put in the output data file, not for any calculations.
+                # The units will be constant, and will be fixed after the first measurement.
+                try:
+                    hr_net_rate = tot_iperf_mean / float(rate_factor)
+                except:
+                    _, rate_units, rate_factor = get_size_units_factor(tot_iperf_mean, rate=True)
+                    hr_net_rate = tot_iperf_mean / float(rate_factor)
+
+                iperf_tot.append([ yes_and_no(test_completed, server_fault), p, tot_iperf_mean, tot_iperf_stdev, hr_net_rate ])
                 mpstat_array, tot_mpstat_mean, tot_mpstat_stdev = get_mpstat_data_single(init_name + '_mpstat.dat')
                 mpstat_tot.append([ p, tot_mpstat_mean, tot_mpstat_stdev ])
                 export_single_data(iperf_array, init_name + '_iperf_processed.dat')
@@ -844,7 +853,7 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
 
         if tot_iperf_mean > 0.0:
             print(plot_message)
-            np.savetxt(iperf_sumname + '.dat', iperf_tot, fmt='%g', header= 'TestOK ' + print_unit + 'Size(b) BW Stdev')
+            np.savetxt(iperf_sumname + '.dat', iperf_tot, fmt='%g', header= 'TestOK ' + print_unit + 'Size(b) BW(b/s) Stdev(b/s) BW(' + rate_units + ')')
             np.savetxt(mpstat_sumname + '.dat', mpstat_tot, fmt='%g', header= print_unit + 'Size(b) Frac Stdev')
             write_gp(combined_sumname + '.plt', basename(iperf_sumname + '.dat'),
                      basename(mpstat_sumname + '.dat'), basename(combined_sumname + '.png'),
