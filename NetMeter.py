@@ -402,6 +402,7 @@ def get_size_units_factor(num, rate=False):
 
         num /= 1024.0
         factor *= 1024.0
+
     return "%3.2f" % num, 'T' + s, str(factor)
 
 
