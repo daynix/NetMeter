@@ -39,7 +39,7 @@ These options are:
 * `gnuplot_bin`: [string] Path to the gnuplot executable on the host (local). (Example: `'gnuplot'`)
 * `test_range`: [iterable] A list of packet sizes to test (preferably as powers of 2). (Example: `[2**x for x in range(5,17)]` - for sizes of  32B to 64KB)
 * `run_duration`: [int] The duration of a single run, in seconds. Must be at least 20, preferable at least 120. (Example: `300`)
-* `streams`: [int] The desired number of streams. (Example: `1`)
+* `streams`: [iterable] The desired number of streams to test. (Example: `[1, 4]`)
 * `protocols`: [iterable] The desired protocol(s). The value MUST be one of 3 possibilities: `['TCP']` | `['UDP']` | `['TCP', 'UDP']`.
 * `creds`: [string] A path to the credentials file for Windows access, which consists of three lines: `username=<USERNAME>`, `password=<PASSWORD>`, and `domain=<DOMAIN>`. (Example: `'creds.dat'`)
 * `title`: [string] A title for the test. Needs to be short and informative, appears as the title of the output html page. For the page to look good, the title needs to be no longer than 80 characters. (Example: `'Some Informative Title'`)

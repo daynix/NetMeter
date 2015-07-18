@@ -55,9 +55,9 @@ test_range = [2**x for x in range(5,17)]
 # Example: 300
 run_duration = 300
 
-# The desired number of streams. [int]
-# Example: 1
-streams = 4
+# The desired numbers of streams. [iterable]
+# Example: [1, 4]
+streams = [1, 4]
 
 # The desired protocol(s). [iterable]
 # The value MUST be one of 3: ['TCP'] | ['UDP'] | ['TCP', 'UDP']
@@ -294,7 +294,7 @@ def place_images(direction, protocol, summary_img, image_list, all_failed = Fals
     return content
 
 
-def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outname, protocol, all_h2g_failed, all_g2h_failed):
+def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outname, protocol, streams, all_h2g_failed, all_g2h_failed):
     content = (
                '<!doctype html>\n'
                '<html>\n'
@@ -370,7 +370,7 @@ def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outna
                '<body>\n'
                '<div id="header">\n'
                )
-    content += ('    <h3>' + title + ' [' + protocol + ']</h3>\n'
+    content += ('    <h3>' + title + ' [' + protocol + ', ' + str(streams) + ' st.]</h3>\n'
                 '</div>\n'
                 '<div id="container">\n'
                )
@@ -597,7 +597,7 @@ def plot_iperf_data(rate_factor, passed, plot_type, net_dat_file):
         return for_all_areas[1] + for_all_points[3]
 
 
-def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protocol,
+def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protocol, streams,
              plot_type = 'singlesize', direction = 'h2g', finished = True,
              server_fault = False, packet_size = 0.0):
     try:
@@ -642,7 +642,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
                'set terminal pngcairo nocrop enhanced size 1024,768 font "Verdana,15"\n'
                'set output "' + img_file +'"\n'
                '\n'
-               'set title "{/=20 ' + plot_title + '}\\n\\n{/=18 (' + plot_subtitle + ', ' + protocol + ')}"\n'
+               'set title "{/=20 ' + plot_title + '}\\n\\n{/=18 (' + plot_subtitle + ', ' + protocol + ', ' + str(streams) + ' st.)}"\n'
                + rate_format + warning_message +
                '\n'
                'set xlabel "' + x_title + '"\n'
@@ -775,8 +775,10 @@ def stop_server(server_addr = False, credsfile = False):
 def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, credsfile, test_title, protocol, export_dir):
     series_time = str(timedelta(seconds = 2 * len(p_sizes) * (runtime + 30) + 20))
     print(time_header() + '\033[92mStarting ' + protocol + ' tests.\033[0m Expected run time: ' + series_time)
-    dir_prep(join(export_dir, timestamp + '_' + protocol))
-    dir_time = join(export_dir, timestamp + '_' + protocol, protocol + '_' + timestamp)
+    top_dir_name = timestamp + '_' + protocol + '_' + str(streams) + '_st'
+    common_filename = protocol + '_' + str(streams) + '_st_' + timestamp
+    dir_prep(join(export_dir, top_dir_name))
+    dir_time = join(export_dir, top_dir_name, common_filename)
     h2g_images = []
     g2h_images = []
     all_h2g_failed = False
@@ -826,8 +828,8 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
                 export_single_data(mpstat_array, init_name + '_mpstat_processed.dat')
                 write_gp(init_name + '.plt', basename(init_name + '_iperf_processed.dat'),
                          basename(init_name + '_mpstat_processed.dat'), basename(init_name + '.png'),
-                         tot_iperf_mean, protocol, plot_type = 'singlesize', direction = direction, finished = test_completed,
-                         server_fault = server_fault, packet_size = p)
+                         tot_iperf_mean, protocol, streams, plot_type = 'singlesize', direction = direction,
+                         finished = test_completed, server_fault = server_fault, packet_size = p)
                 print('Plotting...')
                 pr = Popen([gnuplot_bin, basename(init_name + '.plt')], cwd=dirname(dir_time))
                 pr.wait()
@@ -844,7 +846,7 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
             np.savetxt(mpstat_sumname + '.dat', mpstat_tot, fmt='%g', header='PacketSize(b) Frac Stdev')
             write_gp(combined_sumname + '.plt', basename(iperf_sumname + '.dat'),
                      basename(mpstat_sumname + '.dat'), basename(combined_sumname + '.png'),
-                     tot_iperf_mean, protocol, plot_type = 'multisize', direction = direction,
+                     tot_iperf_mean, protocol, streams, plot_type = 'multisize', direction = direction,
                      server_fault = np.array(iperf_tot)[:,0], packet_size = np.mean(p_sizes))
             pr = Popen([gnuplot_bin, basename(combined_sumname + '.plt')], cwd=dirname(dir_time))
             pr.wait()
@@ -854,8 +856,8 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
             all_g2h_failed = True
 
     print('Exporting html...')
-    gen_html(test_title, protocol + '_' + timestamp + '_h2g_summary.png', protocol + '_' + timestamp + '_g2h_summary.png',
-             h2g_images, g2h_images, dir_time + '.html', protocol, all_h2g_failed, all_g2h_failed)
+    gen_html(test_title, common_filename + '_h2g_summary.png', common_filename + '_g2h_summary.png',
+             h2g_images, g2h_images, dir_time + '.html', protocol, streams, all_h2g_failed, all_g2h_failed)
 
 
 def run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, credsfile, test_title, protocols, export_dir):
@@ -863,13 +865,23 @@ def run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, streams, 
         run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, credsfile, test_title, p, export_dir)
 
 
+def run_tests_for_streams(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, credsfile, test_title, protocols, export_dir):
+    for s in streams:
+        if str(s).isdigit():
+            run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, s, timestamp, credsfile, test_title, protocols, export_dir)
+        else:
+            print('\033[91mERROR:\033[0m Can not test for ' + s + ' streams. Please verify that the requested streams are positive integers.')
+
+
 if __name__ == "__main__":
     # Interrupt handling
     signal.signal(signal.SIGINT, interrupt_exit)
     # Write message
-    if len(protocols) > 1:
-        total_time = str(timedelta(seconds = (2 * len(test_range) * (run_duration + 30) + 20) * len(protocols)))
-        print(time_header() + '\033[92mStarting tests for protocols: ' + ', '.join(protocols) + '.\033[0m Expected total run time: ' + total_time)
+    if (len(protocols) > 1) or (len(streams) > 1):
+        total_time = str(timedelta(seconds = (2 * len(test_range) * (run_duration + 30) + 20) * len(protocols) * len(streams)))
+        print(time_header() + '\033[92mStarting tests for protocols: ' + ', '.join(protocols) + '.\033[0m')
+        print(time_header() + '\033[92mUsing ' + ','.join(str(s) for s in streams) + ' stream(s).\033[0m')
+        print(time_header() + '\033[92mExpected total run time: \033[0m' + '\033[91m' + total_time + '\033[0m')
 
     # Run tests
-    run_tests_for_protocols(remote_addr, local_addr, run_duration, test_range, streams, rundate, creds, title, protocols, export_dir)
+    run_tests_for_streams(remote_addr, local_addr, run_duration, test_range, streams, rundate, creds, title, protocols, export_dir)
