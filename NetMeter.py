@@ -3,7 +3,7 @@
 # Copyright (c) 2015, Daynix Computing LTD (www.daynix.com)
 # All rights reserved.
 #
-# Maintained by bricklets@daynix.com
+# Maintained by oss@daynix.com
 #
 # For documentation please refer to README.md available at https://github.com/daynix/NetMeter
 #
