@@ -47,6 +47,13 @@ After obtaining all the prerequisites and configuring the network device on the 
 
 _IMPORTANT_: Make sure that a firewall does not interfere with the connections!
 
+## Sample output:
+
+A sample output can be seen [here](http://daynix.github.io/NetMeter/SamplePage.html).
+This page was generated automatically, by NetMeter, during a standard test scenario. Notice the distinctive markings for the troublesome tests on the two main plots, "By Buffer Size", ("Approx. BW" in the legend) and the warnings on the corresponding individual plots (in their top left corner). These tests alone can be run manually again, and the same generated gnuplot scripts can be used to plot their new results.
+
+All the generated scripts and files for this page are residing on [this branch](https://github.com/daynix/NetMeter/tree/gh-pages).
+
 ## Looking at the results:
 
 Generally, the results are presented as plots on a generated html page. But all the raw, as well as the processed, data is saved. This is done for the scenarios when more manual interaction is needed. The files that are generated are:
