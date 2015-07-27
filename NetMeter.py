@@ -577,7 +577,7 @@ def plot_iperf_data(rate_factor, passed, plot_type, net_dat_file):
     BW_column = ['2', '3', '3', '3']
     if_not_condition = ['', '', ' : 1/0', ' : 1/0']
     xtic_explicit = ':xtic($2 < 1024.0 ? sprintf("%.0fB", $2) : ($2 < 1048576.0 ? sprintf("%.0fKB", $2/1024.0) : sprintf("%.0fMB", $2/1048576.0)))'
-    xtic = ['', xtic_explicit, '', xtic_explicit]
+    xtic = ['', xtic_explicit, xtic_explicit, xtic_explicit]
     point_color = ['blue', 'blue', 'blue', 'magenta']
     title = ['Mean tot. BW', 'Mean tot. BW', 'Mean tot. BW', 'Approx. BW']
     initial_points = (
