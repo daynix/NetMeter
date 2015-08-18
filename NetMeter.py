@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from time import sleep
 from subprocess import Popen, PIPE
 from os import makedirs
-from os.path import isdir, join
+from os.path import isdir, isfile, join
 from ntpath import dirname, basename
 
 ##############################
@@ -225,6 +225,103 @@ daynix_logo = (
                '5C8b3T+oaQ1ITdfPCBdSAscOaymKln/yqw3b//3S++drvoEVduJqn2CK7yjS063W5IdOBRbGgP37'
                'vCkg+/8BldoYh+HwAs0AAAAASUVORK5CYII='
                )
+
+
+class Connect:
+    def __init__(self, rem_loc):
+        try:
+            Connect.conn_type
+        except AttributeError:
+            self.verify_credsfile()
+
+        self.rem_loc = rem_loc
+        if self.rem_loc == 'local':
+            self.iperf_cmd = [local_iperf]
+            self.stop_iperf = ['killall', '-9', basename(local_iperf)]
+        elif self.rem_loc == 'remote' and Connect.conn_type == 'ssh':
+            self.auth = [access_method, '-i', Connect.key, '-p', ssh_port, '-l', Connect.username,
+                         '-o', 'UserKnownHostsFile=/dev/null', '-o', 'StrictHostKeyChecking=no',
+                         '-o', 'BatchMode=yes', '-o', 'LogLevel=ERROR', remote_addr]
+            self.iperf_cmd = [remote_iperf]
+            self.stop_iperf = ['killall', '-9', basename(remote_iperf)]
+            self.shutdown_command = ['sudo', 'shutdown', '-h', 'now']
+        elif self.rem_loc == 'remote' and Connect.conn_type == 'winexe':
+            self.auth = [access_method, '-A',  creds, '//' + remote_addr]
+            self.iperf_cmd = [remote_iperf]
+            self.stop_iperf = ['taskkill /im ' + basename(remote_iperf) + ' /f']
+            self.shutdown_command = ['shutdown /t 10 /s /f']
+        else:
+            print('\033[91mConnection method not supported.\033[0m Exiting.')
+            sys.exit(1)
+
+
+    def get_command(self, args, outfile = False):
+        if args == 'stop_iperf':
+            cmd = self.stop_iperf
+        else:
+            cmd = self.iperf_cmd + args
+
+        if outfile:
+            if self.rem_loc == 'local':
+                self.print_cmd = ' '.join(cmd)
+            else:
+                self.print_cmd = ' '.join(self.auth) + ' "' + ' '.join(cmd) + '"'
+
+            return self.print_cmd, ' > ' + outfile
+
+        if self.rem_loc == 'local':
+            return cmd
+        else:
+            return self.auth + [' '.join(cmd)]
+
+
+    def shutdown(self):
+        if self.rem_loc == 'remote':
+            print('Shutting down the guest...')
+            if Connect.conn_type == 'ssh':
+                self.auth = self.auth[:-1] + ['-t'] + [self.auth[-1]]
+
+            p = Popen(self.auth + self.shutdown_command)
+            p.wait()
+            sleep(10)
+        else:
+            print('\033[91mYou asked to shut down the host. It must be a mistake!\033[0m')
+
+
+    def verify_credsfile(self):
+        if not isfile(creds):
+            print('\033[91mCredentials file "' + creds + '" not found.\033[0m Exiting.')
+            sys.exit(1)
+
+        Connect.conn_type = basename(access_method)
+        if Connect.conn_type == 'ssh':
+            with open(creds) as c:
+                Connect.username = c.readline().strip().split('=', maxsplit=1)[1]
+                Connect.key = c.readline().strip().split('=', maxsplit=1)[1]
+
+            if not isfile(Connect.key):
+                print('\033[93mSSH key file not found.\033[0m')
+                create_key_trys = 4
+                while create_key_trys:
+                    ns = input('Create the keypair "' + Connect.key + '*" and transfer it to the guest? (Y/n) ')
+                    if ns in ['', 'Y', 'y']:
+                        p = Popen(['ssh-keygen', '-t', 'rsa', '-b', '4096', '-f',
+                                   Connect.key, '-N', '', '-C',
+                                   '"NetMeter_test-' + rundate + '"'])
+                        p.wait()
+                        p = Popen(['ssh-copy-id', '-i', Connect.key + '.pub', '-p',
+                                   ssh_port, Connect.username + '@' + remote_addr])
+                        p.wait()
+                        print('OK')
+                        break
+                    elif ns in ['N', 'n']:
+                        sys.exit(1)
+                    else:
+                        create_key_trys -= 1
+
+                else:
+                    sys.exit(1)
+
 
 def time_header():
     return datetime.now().strftime('[ %H:%M:%S ] ')
