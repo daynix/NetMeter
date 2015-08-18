@@ -920,8 +920,8 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
                                                          init_name, protocol, client_loc)
                 stop_server(server_loc)
                 print('Parsing results...')
-                iperf_array, tot_iperf_mean, tot_iperf_stdev, server_fault = get_iperf_data_single(init_name + '_iperf.dat', protocol,
-                                                                                                   streams, repetitions)
+                (iperf_array, tot_iperf_mean, tot_iperf_stdev, server_fault) =\
+                get_iperf_data_single(init_name + '_iperf.dat', protocol, streams, repetitions)
                 if server_fault == 'too_few':
                     print('\033[93mWARNING:\033[0m The server received fewer connections than expected.')
                 elif server_fault == 'too_many':
@@ -936,7 +936,8 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
                     _, rate_units, rate_factor = get_size_units_factor(tot_iperf_mean, rate=True)
                     hr_net_rate = tot_iperf_mean / float(rate_factor)
 
-                iperf_tot.append([ yes_and_no(test_completed, server_fault), p, tot_iperf_mean, tot_iperf_stdev, hr_net_rate ])
+                iperf_tot.append([ yes_and_no(test_completed, server_fault), p, tot_iperf_mean,
+                                  tot_iperf_stdev, hr_net_rate ])
                 mpstat_array, tot_mpstat_mean, tot_mpstat_stdev = get_mpstat_data_single(init_name + '_mpstat.dat')
                 mpstat_tot.append([ p, tot_mpstat_mean, tot_mpstat_stdev ])
                 export_single_data(iperf_array, init_name + '_iperf_processed.dat')
@@ -957,7 +958,8 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
 
         if tot_iperf_mean > 0.0:
             print(plot_message)
-            np.savetxt(iperf_sumname + '.dat', iperf_tot, fmt='%g', header= 'TestOK ' + print_unit + 'Size(B) BW(b/s) Stdev(b/s) BW(' + rate_units + ')')
+            np.savetxt(iperf_sumname + '.dat', iperf_tot, fmt='%g',
+                       header= 'TestOK ' + print_unit + 'Size(B) BW(b/s) Stdev(b/s) BW(' + rate_units + ')')
             np.savetxt(mpstat_sumname + '.dat', mpstat_tot, fmt='%g', header= print_unit + 'Size(B) Frac Stdev')
             write_gp(combined_sumname + '.plt', basename(iperf_sumname + '.dat'),
                      basename(mpstat_sumname + '.dat'), basename(combined_sumname + '.png'),
@@ -989,7 +991,9 @@ def run_tests_for_streams(remote_addr, local_addr, runtime, p_sizes, streams,
             run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, s,
                                     timestamp, test_title, protocols, export_dir)
         else:
-            print('\033[91mERROR:\033[0m Can not test for ' + s + ' streams. Please verify that the requested streams are positive integers.')
+            print('\033[91mERROR:\033[0m Can not test for ' + s +
+                  ' streams. Please verify that the number of streams is a positive integer.')
+            sys.exit(1)
 
 
 if __name__ == "__main__":
@@ -999,7 +1003,8 @@ if __name__ == "__main__":
     Connect('remote')
     # Write message
     if (len(protocols) > 1) or (len(streams) > 1):
-        total_time = str(timedelta(seconds = (2 * len(test_range) * (run_duration + 30) + 20) * len(protocols) * len(streams)))
+        total_time = str(timedelta(seconds = (2 * len(test_range) * (run_duration + 30) + 20) *
+                         len(protocols) * len(streams)))
         print(time_header() + '\033[92mStarting tests for protocols: ' + ', '.join(protocols) + '.\033[0m')
         print(time_header() + '\033[92mUsing ' + ','.join(str(s) for s in streams) + ' stream(s).\033[0m')
         print(time_header() + '\033[92mExpected total run time: \033[0m' + '\033[91m' + total_time + '\033[0m')
