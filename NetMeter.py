@@ -63,10 +63,22 @@ streams = [1, 4]
 # The value MUST be one of 3: ['TCP'] | ['UDP'] | ['TCP', 'UDP']
 protocols = ['TCP', 'UDP']
 
-# A path to the credentials file for Windows access, which consists of three lines: [str]
-#    username=<USERNAME>  (You probably want to use the username Administrator)
-#    password=<PASSWORD>
-#    domain=<DOMAIN>  (You probably want to use the domain WORKGROUP)
+# Remote access method path: ssh (for Linux) or winexe (for Windows) only. [str]
+# Note: for ssh access, an ssh key is required! The key needs to be unencrypted.
+# If not present, it will be generated (if using OpenSSH).
+# Example: 'ssh' or 'winexe' or '/home/user/bin/winexe'
+access_method = 'winexe'
+# Remote access port (needed only for ssh access). [str]
+# Example: '22'
+ssh_port = '22'
+
+# A path to the credentials file for remote access. [str]
+# This file should contain two or three lines:
+#    username=<USERNAME> (for Windows clients it should be "Administrator", for Linux clients
+#                         - any user that can at least shut down without a password via sudo.
+#                         e.g. "USERNAME ALL= NOPASSWD: /sbin/shutdown -h now" in "visudo")
+#    [ password=<PASSWORD> | key=<PATH_TO_KEY> ] (Password (for winexe access) or a path to the private ssh key (for ssh access))
+#    domain=<DOMAIN> (Needed only for Windows clients)
 # Example: 'creds.dat'
 creds = 'creds.dat'
 
