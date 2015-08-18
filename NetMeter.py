@@ -350,19 +350,22 @@ def dir_prep(d):
     print('The output directory is set to: \033[93m' + d + '\033[0m')
 
 
-def debug_print(text_list):
-    '''
-    Notice: for compatibility, only lists are accepted as arguments!
-    '''
+def debug_print(text):
     if debug:
-        print_list = text_list[:]
-        if print_list[0] == 'winexe':
-            # So that the passed command would be quoted, as it is actually passed this way.
-            print_list[-1] = '"' + print_list[-1] + '"'
+        if isinstance(text, str):
+            # The command is a string
+            print_list = text
+        else:
+            # The command is a list
+            print_list = text[:]
+            if basename(print_list[0]) == 'winexe' or basename(print_list[0]) == 'ssh':
+                # So that the passed command would be quoted, as it is actually passed this way.
+                print_list[-1] = '"' + print_list[-1] + '"'
+
+            print_list = ' '.join(print_list)
 
         print('####### Debug mode on #######\n' +
-              'Command:\n' +
-              ' '.join(print_list) + '\n' +
+              'Command:\n' + print_list + '\n' +
               '#############################')
 
 
@@ -782,12 +785,12 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
 
 def set_protocol_opts(protocol, client = True):
     if protocol == 'TCP':
-        return ''
+        return []
     elif protocol == 'UDP':
         if client:
-            return ' -u -b 1000000M'
+            return ['-u', '-b', '1000000M']
         else:
-            return ' -u'
+            return ['-u']
 
     else:
         print('Protocol must be either "TCP" or "UDP". Exiting.')
@@ -804,40 +807,30 @@ def bend_max_size(size, protocol):
         return size
 
 
-def run_server(protocol, p_size, init_name, server_addr = False, credsfile = False):
+def run_server(protocol, p_size, init_name, rem_loc):
     p_size = bend_max_size(p_size, protocol)
+    iperf_args = ['-s', '-i', '10', '-l', str(p_size), '-y', 'C']
     protocol_opts = set_protocol_opts(protocol, client = False)
-    iperf_args = ' -s' + protocol_opts + ' -i 10 -l ' + str(p_size) + ' -y C'
-    if credsfile:
-        iperf_command = 'winexe -A ' + credsfile + ' //' + server_addr + ' "' + remote_iperf + iperf_args + '"'
-        rem_loc = 'remote'
-    else:
-        iperf_command = local_iperf + iperf_args
-        rem_loc = 'local'
-
+    iperf_args += protocol_opts
+    iperf_command, output = Connect(rem_loc).get_command(iperf_args, init_name + '_iperf.dat')
     print('Starting ' + rem_loc + ' server...')
-    debug_print([iperf_command])
-    p = Popen(iperf_command + ' > ' + init_name + '_iperf.dat', shell=True)
+    debug_print(iperf_command)
+    p = Popen(iperf_command + output, shell=True)
     sleep(10)
 
 
-def run_client(server_addr, runtime, p_size, streams, init_name, protocol, credsfile = False):
+def run_client(server_addr, runtime, p_size, streams, init_name, protocol, rem_loc):
     p_size = bend_max_size(p_size, protocol)
     repetitions, mod = divmod(runtime, 10)
     if not mod:
         runtime -= 1
 
+    iperf_args =  ['-c', server_addr, '-t', str(runtime), '-l', str(p_size),
+                   '-P', str(streams)]
     protocol_opts = set_protocol_opts(protocol)
-    iperf_args =  (' -c ' + server_addr + protocol_opts + ' -t ' + str(runtime) + ' -l ' + str(p_size)
-                   + ' -P ' + str(streams))
-    if credsfile:
-        iperf_command = ['winexe', '-A',  credsfile, '//' + remote_addr, remote_iperf + iperf_args]
-        direction_message = 'guest to host'
-    else:
-        iperf_command = [local_iperf]
-        iperf_command.extend(iperf_args.split())
-        direction_message = 'host to guest'
-
+    iperf_args += protocol_opts
+    iperf_command = Connect(rem_loc).get_command(iperf_args)
+    direction_message = 'guest to host' if rem_loc == 'local' else 'host to guest'
     size_name = get_round_size_name(p_size)
     print(time_header() + 'Running ' + size_name + ' ' + direction_message + ' test. (Duration: '
           + str(timedelta(seconds = repetitions * 10 + mod)) + ')')
@@ -866,15 +859,9 @@ def run_client(server_addr, runtime, p_size, streams, init_name, protocol, creds
         return False, repetitions
 
 
-def stop_server(server_addr = False, credsfile = False):
-    if credsfile:
-        iperf_stop_command = ['winexe', '-A', credsfile, '//' + server_addr, 'taskkill /im ' + basename(remote_iperf) + ' /f']
-        rem_loc = 'remote'
-    else:
-        iperf_stop_command = ['killall', '-9', local_iperf]
-        rem_loc = 'local'
-
-    print('Stopping previous ' + rem_loc  + ' server instances...')
+def stop_server(rem_loc):
+    iperf_stop_command = Connect(rem_loc).get_command('stop_iperf')
+    print('Stopping previous ' + rem_loc  + ' Iperf instances...')
     debug_print(iperf_stop_command)
     p = Popen(iperf_stop_command, stdout=PIPE, stderr=PIPE)
     p.wait()
@@ -888,7 +875,8 @@ def stop_server(server_addr = False, credsfile = False):
     sleep(10)
 
 
-def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, credsfile, test_title, protocol, export_dir):
+def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
+              test_title, protocol, export_dir):
     series_time = str(timedelta(seconds = 2 * len(p_sizes) * (runtime + 30) + 20))
     print(time_header() + '\033[92mStarting ' + protocol + ' tests.\033[0m Expected run time: ' + series_time)
     top_dir_name = timestamp + '_' + protocol + '_' + str(streams) + '_st'
@@ -900,19 +888,19 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
     g2h_images = []
     all_h2g_failed = False
     all_g2h_failed = False
-    stop_server()
-    stop_server(remote_addr, credsfile)
+    stop_server('local')
+    stop_server('remote')
     for direction in ['h2g', 'g2h']:
         if direction == 'h2g':
             server_addr = remote_addr
-            server_creds = credsfile
-            client_creds = False
+            server_loc = 'remote'
+            client_loc = 'local'
             image_list = h2g_images
             plot_message = 'Plotting host --> guest summary...'
         else:
             server_addr = local_addr
-            server_creds = False
-            client_creds = credsfile
+            server_loc = 'local'
+            client_loc = 'remote'
             image_list = g2h_images
             plot_message = 'Plotting guest --> host summary...'
 
@@ -927,9 +915,10 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
             combined_sumname = dir_time + '_' + direction + '_summary'
             try:
                 print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-                run_server(protocol, p, init_name, server_addr, server_creds)
-                test_completed, repetitions = run_client(server_addr, runtime, p, streams, init_name, protocol, client_creds)
-                stop_server(server_addr, server_creds)
+                run_server(protocol, p, init_name, server_loc)
+                test_completed, repetitions = run_client(server_addr, runtime, p, streams,
+                                                         init_name, protocol, client_loc)
+                stop_server(server_loc)
                 print('Parsing results...')
                 iperf_array, tot_iperf_mean, tot_iperf_stdev, server_fault = get_iperf_data_single(init_name + '_iperf.dat', protocol,
                                                                                                    streams, repetitions)
@@ -986,15 +975,19 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, cre
              g2h_images, dir_time + '.html', protocol, streams, all_h2g_failed, all_g2h_failed, print_unit)
 
 
-def run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, credsfile, test_title, protocols, export_dir):
+def run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, streams,
+                            timestamp, test_title, protocols, export_dir):
     for p in protocols:
-        run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, credsfile, test_title, p, export_dir)
+        run_tests(remote_addr, local_addr, runtime, p_sizes,
+                  streams, timestamp, test_title, p, export_dir)
 
 
-def run_tests_for_streams(remote_addr, local_addr, runtime, p_sizes, streams, timestamp, credsfile, test_title, protocols, export_dir):
+def run_tests_for_streams(remote_addr, local_addr, runtime, p_sizes, streams,
+                          timestamp, test_title, protocols, export_dir):
     for s in streams:
         if str(s).isdigit():
-            run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, s, timestamp, credsfile, test_title, protocols, export_dir)
+            run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, s,
+                                    timestamp, test_title, protocols, export_dir)
         else:
             print('\033[91mERROR:\033[0m Can not test for ' + s + ' streams. Please verify that the requested streams are positive integers.')
 
@@ -1002,6 +995,8 @@ def run_tests_for_streams(remote_addr, local_addr, runtime, p_sizes, streams, ti
 if __name__ == "__main__":
     # Interrupt handling
     signal.signal(signal.SIGINT, interrupt_exit)
+    # Verifying credsfile existence
+    Connect('remote')
     # Write message
     if (len(protocols) > 1) or (len(streams) > 1):
         total_time = str(timedelta(seconds = (2 * len(test_range) * (run_duration + 30) + 20) * len(protocols) * len(streams)))
@@ -1010,10 +1005,8 @@ if __name__ == "__main__":
         print(time_header() + '\033[92mExpected total run time: \033[0m' + '\033[91m' + total_time + '\033[0m')
 
     # Run tests
-    run_tests_for_streams(remote_addr, local_addr, run_duration, test_range, streams, rundate, creds, title, protocols, export_dir)
+    run_tests_for_streams(remote_addr, local_addr, run_duration, test_range,
+                          streams, rundate, title, protocols, export_dir)
     # Shut down the guest if needed
     if shutdown:
-        print('Shutting down the guest...')
-        p = Popen(['winexe', '-A', creds, '//' + remote_addr, 'shutdown /t 10 /s /f'])
-        p.wait()
-        sleep(10)
+        Connect('remote').shutdown()
