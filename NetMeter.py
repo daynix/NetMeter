@@ -830,7 +830,7 @@ def run_client(server_addr, runtime, p_size, streams, init_name, protocol, rem_l
     protocol_opts = set_protocol_opts(protocol)
     iperf_args += protocol_opts
     iperf_command = Connect(rem_loc).get_command(iperf_args)
-    direction_message = 'guest to host' if rem_loc == 'local' else 'host to guest'
+    direction_message = 'host to guest' if rem_loc == 'local' else 'guest to host'
     size_name = get_round_size_name(p_size)
     print(time_header() + 'Running ' + size_name + ' ' + direction_message + ' test. (Duration: '
           + str(timedelta(seconds = repetitions * 10 + mod)) + ')')
