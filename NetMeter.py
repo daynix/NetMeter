@@ -296,8 +296,23 @@ class Connect:
         Connect.conn_type = basename(access_method)
         if Connect.conn_type == 'ssh':
             with open(creds) as c:
-                Connect.username = c.readline().strip().split('=', maxsplit=1)[1]
-                Connect.key = c.readline().strip().split('=', maxsplit=1)[1]
+                try:
+                    credsline = c.readline().strip().split('=', maxsplit=1)
+                    if credsline[0].strip() == 'username':
+                        Connect.username = credsline[1].strip()
+                    else:
+                        raise
+
+                    credsline = c.readline().strip().split('=', maxsplit=1)
+                    if credsline[0].strip() == 'key':
+                        Connect.key = credsline[1].strip()
+                    else:
+                        raise
+
+                except:
+                    print('\033[91mError: Please verify that the username and the key '
+                          'are specified correctly in the creds file!\033[0m')
+                    sys.exit(1)
 
             if not isfile(Connect.key):
                 print('\033[93mSSH key file not found.\033[0m')
