@@ -686,7 +686,7 @@ def export_single_data(data_processed, data_outname):
     np.savetxt(data_outname, data_processed, fmt='%g', header='TimeStamp(s) Sum Stdev')
 
 
-def plot_iperf_data(rate_factor, passed, plot_type, net_dat_file):
+def plot_iperf_data(passed, plot_type, net_dat_file):
     '''
     Get different types of plots for the following cases:
     1. Single size plot.
@@ -694,7 +694,6 @@ def plot_iperf_data(rate_factor, passed, plot_type, net_dat_file):
     3. Multi size plot where some tests had problems.
     4. Multi size plot where all tests had problems.
     ---
-    rate_factor - the factor by which the rate should be divided
     passed - Numpy array, with 1 if a test went correctly, and 0 otherwise
     plot_type - 'singlesize' or 'multisize'
     net_dat_file - the file with PROCESSED Ipref data
@@ -708,7 +707,7 @@ def plot_iperf_data(rate_factor, passed, plot_type, net_dat_file):
     point_color = ['blue', 'blue', 'blue', 'magenta']
     title = ['Mean tot. BW', 'Mean tot. BW', 'Mean tot. BW', 'Approx. BW']
     initial_points = (
-                      '     "" using {0}:({1}${2}/' + rate_factor + '{3}){4} with points'
+                      '     "" using {0}:({1}${2}/rf{3}){4} with points'
                             ' pt 2 ps 1.5 lw 3 lc rgb "{5}" title "{6}", \\\n'
                      )
     for_all_points = [initial_points.format(x_column[i], condition_statement[i], BW_column[i], if_not_condition[i],
@@ -716,8 +715,8 @@ def plot_iperf_data(rate_factor, passed, plot_type, net_dat_file):
                       for i in [0, 1, 2, 3]]
     std_column = ['3', '4']
     initial_areas = (
-                     '"' + net_dat_file + '" using {0}:(${1}/' + rate_factor + '-${2}/' + rate_factor + '):'
-                     '(${1}/' + rate_factor + '+${2}/' + rate_factor + ') with filledcurves lc rgb "blue" notitle, \\\n'
+                     '"' + net_dat_file + '" using {0}:(${1}/rf-${2}/rf):'
+                     '(${1}/rf+${2}/rf) with filledcurves lc rgb "blue" notitle, \\\n'
                     )
     for_all_areas = [initial_areas.format(x_column[i], BW_column[i], std_column[i])
                      for i in [0, 1]]
@@ -754,8 +753,8 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
     else:
         plot_title = 'Bandwidth \\\\& CPU usage for different packet sizes'
         x_title = print_unit + ' size'
-        labels_above_points = ('     "" using 2:($3/' + rate_factor + '):(sprintf("%.2f ' + rate_units + '",'
-                               ' $3/' + rate_factor + ')) with labels offset 0.9,1.0 rotate by 90 font ",12" notitle, \\\n')
+        labels_above_points = ('     "" using 2:($3/rf):(sprintf("%.2f ' + rate_units + '",'
+                               ' $3/rf)) with labels offset 0.9,1.0 rotate by 90 font ",12" notitle, \\\n')
         log2_scale = 'set logscale x 2\n'
         rotate_xtics = 'set xtics rotate by -30\n'
         formatx = ('printxsizes(x) = x < 1024.0 ? sprintf("%.0fB", x) '
@@ -775,7 +774,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
     elif server_fault == 'too_many':
         warning_message = 'set label "Warning:\\nToo many connections!\\nResults may not be accurate!" at screen 0.01, screen 0.96 tc rgb "red"\n'
 
-    plot_net_data = plot_iperf_data(rate_factor, server_fault, plot_type, net_dat_file)
+    plot_net_data = plot_iperf_data(server_fault, plot_type, net_dat_file)
     content = (
                'set terminal pngcairo nocrop enhanced size 1024,768 font "Verdana,15"\n'
                'set output "' + img_file +'"\n'
@@ -793,6 +792,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
                'set bmargin 4.6\n'
                + log2_scale + rotate_xtics + formatx +
                '\n'
+               'rf = ' + rate_factor + '  # rate factor\n'
                'set style fill transparent solid 0.2 noborder\n'
                'plot ' + plot_net_data + labels_above_points +
                '     "' + proc_dat_file + '" using 1:($2-$3):($2+$3) with filledcurves lc rgb "red" axes x1y2 notitle, \\\n'
