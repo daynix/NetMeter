@@ -224,7 +224,7 @@ daynix_logo = (
                'cNvn/7A8f+koDjCK7PvSNCJx+AaNQmjHF12f5hQOyQ/v2Xrknbzz59iIBrad6XSgCFUI8WZVdtZ3'
                '5C8b3T+oaQ1ITdfPCBdSAscOaymKln/yqw3b//3S++drvoEVduJqn2CK7yjS063W5IdOBRbGgP37'
                'vCkg+/8BldoYh+HwAs0AAAAASUVORK5CYII='
-               )
+              )
 
 
 class Connect:
@@ -361,7 +361,7 @@ def dir_prep(d):
         except:
             print('The output directory (' + d + ') could not be created. Exiting.')
             sys.exit(1)
-    
+
     print('The output directory is set to: \033[93m' + d + '\033[0m')
 
 
