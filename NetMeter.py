@@ -703,7 +703,7 @@ def plot_iperf_data(rate_factor, passed, plot_type, net_dat_file):
     condition_statement = ['', '', '$1 != 0 ? ', '$1 == 0 ? ']
     BW_column = ['2', '3', '3', '3']
     if_not_condition = ['', '', ' : 1/0', ' : 1/0']
-    xtic_explicit = ':xtic($2 < 1024.0 ? sprintf("%.0fB", $2) : ($2 < 1048576.0 ? sprintf("%.0fKB", $2/1024.0) : sprintf("%.0fMB", $2/1048576.0)))'
+    xtic_explicit = ':xtic(printxsizes($2))'
     xtic = ['', xtic_explicit, xtic_explicit, xtic_explicit]
     point_color = ['blue', 'blue', 'blue', 'magenta']
     title = ['Mean tot. BW', 'Mean tot. BW', 'Mean tot. BW', 'Approx. BW']
@@ -750,6 +750,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
         labels_above_points = ''
         log2_scale = ''
         rotate_xtics = ''
+        formatx = ''
     else:
         plot_title = 'Bandwidth \\\\& CPU usage for different packet sizes'
         x_title = print_unit + ' size'
@@ -757,6 +758,9 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
                                ' $3/' + rate_factor + ')) with labels offset 0.9,1.0 rotate by 90 font ",12" notitle, \\\n')
         log2_scale = 'set logscale x 2\n'
         rotate_xtics = 'set xtics rotate by -30\n'
+        formatx = ('printxsizes(x) = x < 1024.0 ? sprintf("%.0fB", x) '
+                   ': (x < 1048576.0 ? sprintf("%.0fKB", x/1024.0) '
+                   ': sprintf("%.0fMB", x/1048576.0))\n')
 
     if direction == 'h2g':
         plot_subtitle = 'Host to Guest'
@@ -787,7 +791,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
                'set y2range [0:1]\n'
                'set key bmargin center horizontal box samplen 1 width -1\n'
                'set bmargin 4.6\n'
-               + log2_scale + rotate_xtics +
+               + log2_scale + rotate_xtics + formatx +
                '\n'
                'set style fill transparent solid 0.2 noborder\n'
                'plot ' + plot_net_data + labels_above_points +
