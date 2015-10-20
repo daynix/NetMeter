@@ -304,10 +304,10 @@ def dir_prep(d):
     print('The output directory is set to: \033[93m' + d + '\033[0m')
 
 
-def debug_print(text, rem_loc, dir_time):
+def cmd_print(text, rem_loc, dir_time):
     if isinstance(text, str):
         # The command is a string
-        print_list = text
+        print_cmd = text
         # The last quoted string
         try:
             print_log = text.rsplit('"', 2)[1]
@@ -316,21 +316,21 @@ def debug_print(text, rem_loc, dir_time):
 
     else:
         # The command is a list
-        print_list = text[:]
-        print_log = ' '.join(print_list)
-        if basename(print_list[0]) == 'winexe' or basename(print_list[0]) == 'ssh':
-            print_log = print_list[-1]
+        print_cmd = text[:]
+        print_log = ' '.join(print_cmd)
+        if basename(print_cmd[0]) == 'winexe' or basename(print_cmd[0]) == 'ssh':
+            print_log = print_cmd[-1]
             # So that the passed command would be quoted, as it is actually passed this way.
-            print_list[-1] = '"' + print_list[-1] + '"'
+            print_cmd[-1] = '"' + print_cmd[-1] + '"'
 
-        print_list = ' '.join(print_list)
+        print_cmd = ' '.join(print_cmd)
 
     with open(dir_time + '_iperf_commands.log', 'a') as logfile:
             logfile.write(time_header() + rem_loc[:3] + ': ' + print_log + '\n')
 
     if debug:
         print('####### Debug mode on #######\n' +
-              'Command:\n' + print_list + '\n' +
+              'Command:\n' + print_cmd + '\n' +
               '#############################')
 
 
@@ -783,7 +783,7 @@ def run_server(protocol, p_size, init_name, dir_time, rem_loc):
     iperf_args += protocol_opts
     iperf_command, output = Connect(rem_loc).get_command(iperf_args, init_name + '_iperf.dat')
     print('Starting ' + rem_loc + ' server...')
-    debug_print(iperf_command, rem_loc, dir_time)
+    cmd_print(iperf_command, rem_loc, dir_time)
     p = Popen(iperf_command + output, shell=True)
     sleep(10)
 
@@ -803,7 +803,7 @@ def run_client(server_addr, runtime, p_size, streams, init_name, dir_time, proto
     size_name = get_round_size_name(p_size)
     print(time_header() + 'Running ' + size_name + ' ' + direction_message + ' test. (Duration: '
           + str(timedelta(seconds = repetitions * 10 + mod)) + ')')
-    debug_print(iperf_command, rem_loc, dir_time)
+    cmd_print(iperf_command, rem_loc, dir_time)
     iperf_proc = Popen(iperf_command)
     mpstat_proc = Popen('mpstat -P ALL 10 ' + str(repetitions) + ' > ' + init_name + '_mpstat.dat', shell=True)
     mpstat_proc.wait()
@@ -831,7 +831,7 @@ def run_client(server_addr, runtime, p_size, streams, init_name, dir_time, proto
 def stop_server(rem_loc, dir_time):
     iperf_stop_command = Connect(rem_loc).get_command('stop_iperf')
     print('Stopping previous ' + rem_loc  + ' Iperf instances...')
-    debug_print(iperf_stop_command, rem_loc, dir_time)
+    cmd_print(iperf_stop_command, rem_loc, dir_time)
     p = Popen(iperf_stop_command, stdout=PIPE, stderr=PIPE)
     p.wait()
     out, err = p.communicate()
