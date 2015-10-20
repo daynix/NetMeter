@@ -120,4 +120,4 @@ This will produce comparison plots between (`old_dir1` and `new_dir1`), (`old_di
   pdfunite page1.pdf page2.pdf ... output.pdf
   ```
     * `pdfunite` should be available on your system if you have Poppler installed.
-    * DO NOT FORGET to specify the output file! Otherwise, the last results page will be overwritten!
+    * **DO NOT FORGET** to specify the output file! Otherwise, the last results page will be overwritten!
