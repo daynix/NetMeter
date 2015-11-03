@@ -648,10 +648,12 @@ def plot_iperf_data(passed, plot_type, net_dat_file):
     plot_type - 'singlesize' or 'multisize'
     net_dat_file - the file with PROCESSED Ipref data
     '''
-    x_column = ['1', '2', '2', '2']
-    condition_statement = ['', '', '$1 != 0 ? ', '$1 == 0 ? ']
+    x_column_points = ['1', '2', '2', '2']
+    x_column_areas = ['1', '($1 >= 0 ? $2 : 1/0)', '($1 >= 0 ? $2 : 1/0)',
+                      '($1 >= 0 ? $2 : 1/0)']
+    condition_statement = ['', '$1 >= 0 ? ', '$1 >= 0 ? ', '$1 == 0 ? ']
     BW_column = ['2', '3', '3', '3']
-    if_not_condition = ['', '', ' : 1/0', ' : 1/0']
+    if_not_condition = ['', ' : 1/0', ' : 1/0', ' : 1/0']
     xtic_explicit = ':xtic(printxsizes($2))'
     xtic = ['', xtic_explicit, xtic_explicit, xtic_explicit]
     point_color = ['blue', 'blue', 'blue', 'magenta']
@@ -660,7 +662,7 @@ def plot_iperf_data(passed, plot_type, net_dat_file):
                       '     "" using {0}:({1}${2}/rf{3}){4} with points'
                             ' pt 2 ps 1.5 lw 3 lc rgb "{5}" title "{6}", \\\n'
                      )
-    for_all_points = [initial_points.format(x_column[i], condition_statement[i], BW_column[i], if_not_condition[i],
+    for_all_points = [initial_points.format(x_column_points[i], condition_statement[i], BW_column[i], if_not_condition[i],
                                             xtic[i], point_color[i], title[i])
                       for i in [0, 1, 2, 3]]
     std_column = ['3', '4']
@@ -668,13 +670,13 @@ def plot_iperf_data(passed, plot_type, net_dat_file):
                      '"' + net_dat_file + '" using {0}:(${1}/rf-${2}/rf):'
                      '(${1}/rf+${2}/rf) with filledcurves lc rgb "blue" notitle, \\\n'
                     )
-    for_all_areas = [initial_areas.format(x_column[i], BW_column[i], std_column[i])
+    for_all_areas = [initial_areas.format(x_column_areas[i], BW_column[i], std_column[i])
                      for i in [0, 1]]
     if plot_type == 'singlesize':
         return for_all_areas[0] + for_all_points[0]
     elif passed.all():
         return for_all_areas[1] + for_all_points[1]
-    elif passed.any():
+    elif passed[(passed >= 0).nonzero()].any():
         return for_all_areas[1] + for_all_points[2] + for_all_points[3]
     else:
         return for_all_areas[1] + for_all_points[3]
@@ -697,14 +699,23 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
         plot_title = print_unit + ' size: ' + packet_size + ', Av. rate: ' + net_rate + ' ' + rate_units
         x_title = 'Time (s)'
         labels_above_points = ''
+        failed_labels = ''
+        stats_calc = ''
         log2_scale = ''
         rotate_xtics = ''
         formatx = ''
     else:
         plot_title = 'Bandwidth \\\\& CPU usage for different packet sizes'
         x_title = print_unit + ' size'
-        labels_above_points = ('     "" using 2:($3/rf):(sprintf("%.2f ' + rate_units + '",'
-                               ' $3/rf)) with labels offset 0.9,1.0 rotate by 90 font ",12" notitle, \\\n')
+        labels_above_points = ('     "" using 2:($1 >= 0 ? $3/rf : 1/0)'
+                               ':(sprintf("%.2f ' + rate_units + '", $3/rf))'
+                               ' with labels offset 0.9,1.0 rotate by 90'
+                               ' font ",12" notitle, \\\n')
+        failed_labels = ('     "" using ($1 < 0 ? $2 : 1/0):(STATS_min/rf)'
+                         ':(sprintf("Net test failed!"))'
+                         ' with labels offset 0.9,2.5 rotate by 90'
+                         ' tc rgb "red" font ",12" notitle, \\\n')
+        stats_calc = 'stats "' + net_dat_file + '" using ($1 >= 0 ? $3 : 1/0) nooutput\n'
         log2_scale = 'set logscale x 2\n'
         rotate_xtics = 'set xtics rotate by -30\n'
         formatx = ('printxsizes(x) = x < 1024.0 ? sprintf("%.0fB", x) '
@@ -740,11 +751,12 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
                'set y2range [0:1]\n'
                'set key bmargin center horizontal box samplen 1 width -1\n'
                'set bmargin 4.6\n'
-               + log2_scale + rotate_xtics + formatx +
+               + rotate_xtics + formatx +
                '\n'
                'rf = ' + rate_factor + '  # rate factor\n'
+               + stats_calc + log2_scale +
                'set style fill transparent solid 0.2 noborder\n'
-               'plot ' + plot_net_data + labels_above_points +
+               'plot ' + plot_net_data + labels_above_points + failed_labels +
                '     "' + proc_dat_file + '" using 1:($2-$3):($2+$3) with filledcurves lc rgb "red" axes x1y2 notitle, \\\n'
                '     "" using 1:2 with points pt 1 ps 1.5 lw 3 lc rgb "red" axes x1y2 title "Mean tot. CPU"\n'
               )
@@ -890,6 +902,8 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
                                                          client_loc)
                 stop_server(server_loc, dir_time)
                 print('Parsing results...')
+                mpstat_array, tot_mpstat_mean, tot_mpstat_stdev = get_mpstat_data_single(init_name + '_mpstat.dat')
+                mpstat_tot.append([ p, tot_mpstat_mean, tot_mpstat_stdev ])
                 (iperf_array, tot_iperf_mean, tot_iperf_stdev, server_fault) =\
                 get_iperf_data_single(init_name + '_iperf.dat', protocol, streams, repetitions)
                 if server_fault == 'too_few':
@@ -906,10 +920,6 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
                     _, rate_units, rate_factor = get_size_units_factor(tot_iperf_mean, rate=True)
                     hr_net_rate = tot_iperf_mean / float(rate_factor)
 
-                iperf_tot.append([ yes_and_no(test_completed, server_fault), p, tot_iperf_mean,
-                                  tot_iperf_stdev, hr_net_rate ])
-                mpstat_array, tot_mpstat_mean, tot_mpstat_stdev = get_mpstat_data_single(init_name + '_mpstat.dat')
-                mpstat_tot.append([ p, tot_mpstat_mean, tot_mpstat_stdev ])
                 export_single_data(iperf_array, init_name + '_iperf_processed.dat')
                 export_single_data(mpstat_array, init_name + '_mpstat_processed.dat')
                 write_gp(init_name + '.plt', basename(init_name + '_iperf_processed.dat'),
@@ -920,10 +930,13 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
                 pr = Popen([gnuplot_bin, basename(init_name + '.plt')], cwd=dirname(dir_time))
                 pr.wait()
                 image_list.append(basename(init_name + '.png'))
+                iperf_tot.append([ yes_and_no(test_completed, server_fault), p, tot_iperf_mean,
+                                  tot_iperf_stdev, hr_net_rate ])
                 print('============================================================')
             except ValueError as err:
                 print(time_header() + '\033[91mERROR:\033[0m ' + err.args[0] + ' Skipping test...')
                 image_list.append(get_round_size_name(p, gap = True))
+                iperf_tot.append([ -1, p, 0, 0, 0 ])
                 print('============================================================')
 
         if tot_iperf_mean > 0.0:

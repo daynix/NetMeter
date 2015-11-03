@@ -89,7 +89,7 @@ Generally, the results are presented as plots on a generated html page. But all 
 * `<common>_<test direction>_<buffer/datagram size>_iperf_processed.dat`: the processed Iperf output. It contains 3 columns: time (relatively to the beginning of this specific measurement), the sum of the bandwidths from all the streams (obviously, if only one stream was used, the sum is just the bandwidth of this stream), and the standard deviation (if one stream is used, the standard deviation will be zero). The bandwidth units are b/s.
 * `<common>_<test direction>_<buffer/datagram size>_mpstat_processed.dat`: Very similar to the above, only the measurements represent the CPU usage fraction on the host machine. Notice, that to get accurate readings here, as little as possible processes besides the test setup should run on the host.
 * `<common>_<test direction>_iperf_summary.dat`: Summary of the Iperf results. The 5 columns represent:
-    * Did the test complete correctly? (0/1)
+    * Did the test complete correctly? (1: OK, 0: test had problems, -1: test failed entirely)
     * The buffer/datagram size (B)
     * Bandwidth (b/s)
     * Standard deviation between the measurements of the same buffer/datagram size (b/s)

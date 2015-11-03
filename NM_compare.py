@@ -89,8 +89,10 @@ def get_rate_factor(n):
 def get_iperf_metadata(f):
     data = np.loadtxt(f)
     datamax = np.amax(data[:,iperf_datacolumn])
-    allOK = np.all(data[:,0])
-    anyOK = np.any(data[:,0])
+    test_status = data[:,0]
+    non_failed_test_status = test_status[(test_status >= 0).nonzero()]
+    allOK = np.all(non_failed_test_status)
+    anyOK = np.any(non_failed_test_status)
     if allOK:
         status = 'all_OK'
     elif anyOK:
@@ -106,22 +108,20 @@ def gen_net_pointplots(status, type):
         color = 'red'
         err_color = 'cyan'
         lw = '4'
-        endline = ', \\'
     else:
         color = 'blue'
         err_color = 'magenta'
         lw = '3'
-        endline = ''
 
     if status == 'all_OK':
-        return ('     "" using 2:($3/rf):xtic(printxsizes($2)) with points '
-                'pt 2 ps 0.8 lw ' + lw + ' lc rgb "' + color + '" title "Mean - ' + type + '"' + endline + '\n')
+        return ('     "" using 2:($1 >= 0 ? $3/rf : 1/0):xtic(printxsizes($2)) with points '
+                'pt 2 ps 0.8 lw ' + lw + ' lc rgb "' + color + '" title "Mean - ' + type + '", \\\n')
     else:
         content = ('     "" using 2:($1 == 0 ? $3/rf : 1/0):xtic(printxsizes($2)) with points '
-                   'pt 2 ps 0.8 lw ' + lw + ' lc rgb "' + err_color + '" title "Approx. - ' + type + '"' + endline + '\n')
+                   'pt 2 ps 0.8 lw ' + lw + ' lc rgb "' + err_color + '" title "Approx. - ' + type + '", \\\n')
 
     if status == 'some_OK':
-        content = ('     "" using 2:($1 != 0 ? $3/rf : 1/0):xtic(printxsizes($2)) with points '
+        content = ('     "" using 2:($1 >= 0 ? $3/rf : 1/0):xtic(printxsizes($2)) with points '
                    'pt 2 ps 0.8 lw ' + lw + ' lc rgb "' + color + '" title "Mean - ' + type + '", \\\n') + content
 
     return content
@@ -134,11 +134,13 @@ def iperf_plot_block(BW_units, data_unit, rate_factor, dir_title, old_datfile, n
                'set yrange [0:*]\n'
                'rf = ' + str(rate_factor) + '\n'
                'set title "{/=18 ' + dir_title + '}"\n'
-               'plot "' + old_datfile + '" using 2:($3/rf-$4/rf):($3/rf+$4/rf) with filledcurves lc rgb "red" notitle, \\\n'
+               'plot "' + old_datfile + '" using ($1 >= 0 ? $2 : 1/0):($3/rf-$4/rf):($3/rf+$4/rf) with filledcurves lc rgb "red" notitle, \\\n'
               )
     content += gen_net_pointplots(old_status, 'old')
-    content += '     "' + new_datfile + '" using 2:($3/rf-$4/rf):($3/rf+$4/rf) with filledcurves lc rgb "blue" notitle, \\\n'
+    content += '     "" using ($1 < 0 ? $2 : 1/0):(0):(sprintf("Old failed!")) with labels offset 0.9,2.5 rotate by 90 tc rgb "red" font ",12" notitle, \\\n'
+    content += '     "' + new_datfile + '" using ($1 >= 0 ? $2 : 1/0):($3/rf-$4/rf):($3/rf+$4/rf) with filledcurves lc rgb "blue" notitle, \\\n'
     content += gen_net_pointplots(new_status, 'new')
+    content += '     "" using ($1 < 0 ? $2 : 1/0):(0):(sprintf("New failed!")) with labels offset 0.9,7.0 rotate by 90 tc rgb "blue" font ",12" notitle\n'
     return content
 
 
