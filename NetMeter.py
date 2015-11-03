@@ -944,6 +944,8 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
             np.savetxt(iperf_sumname + '.dat', iperf_tot, fmt='%g',
                        header= 'TestOK ' + print_unit + 'Size(B) BW(b/s) Stdev(b/s) BW(' + rate_units + ')')
             np.savetxt(mpstat_sumname + '.dat', mpstat_tot, fmt='%g', header= print_unit + 'Size(B) Frac Stdev')
+            non_failed_BW = [l[2] for l in iperf_tot if l[2]]
+            tot_iperf_mean = sum(non_failed_BW)/len(non_failed_BW)
             write_gp(combined_sumname + '.plt', basename(iperf_sumname + '.dat'),
                      basename(mpstat_sumname + '.dat'), basename(combined_sumname + '.png'),
                      tot_iperf_mean, protocol, streams, print_unit, plot_type = 'multisize', direction = direction,
