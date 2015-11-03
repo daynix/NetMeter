@@ -127,7 +127,10 @@ def gen_net_pointplots(status, type):
     return content
 
 
-def iperf_plot_block(BW_units, data_unit, rate_factor, dir_title, old_datfile, new_datfile, old_status, new_status):
+def iperf_plot_block(data_unit, dir_title, old_datfile, new_datfile):
+    old_max, old_status = get_iperf_metadata(old_datfile)
+    new_max, new_status = get_iperf_metadata(new_datfile)
+    BW_units, rate_factor = get_rate_factor(max(old_max, new_max))
     content = (
                'set ylabel "Bandwidth (' + BW_units + ')"\n'
                'set xlabel "' + data_unit + ' size"\n'
@@ -222,23 +225,15 @@ def write_comp_gp(old_d, new_d, out_basename):
     content += '\nset multiplot\n'
     if h2g_block:
         dir_title = 'Host to Guest'
-        old_max, old_status = get_iperf_metadata(old_files[0])
-        new_max, new_status = get_iperf_metadata(new_files[0])
-        BW_units, rate_factor = get_rate_factor(max(old_max, new_max))
         content += 'set origin 0.0,0.45\n'
-        content += iperf_plot_block(BW_units, data_unit, rate_factor, dir_title,
-                                    old_files[0], new_files[0], old_status, new_status)
+        content += iperf_plot_block(data_unit, dir_title, old_files[0], new_files[0])
         content += '\nset origin 0.495,0.45\n'
         content += mpstat_plot_block(data_unit, dir_title, old_files[1], new_files[1])
 
     if g2h_block:
         dir_title = 'Guest to Host'
-        old_max, old_status = get_iperf_metadata(old_files[2])
-        new_max, new_status = get_iperf_metadata(new_files[2])
-        BW_units, rate_factor = get_rate_factor(max(old_max, new_max))
         content += '\nset origin 0.0,0.0\n'
-        content += iperf_plot_block(BW_units, data_unit, rate_factor, dir_title,
-                                    old_files[2], new_files[2], old_status, new_status)
+        content += iperf_plot_block(data_unit, dir_title, old_files[2], new_files[2])
         content += '\nset origin 0.495,0.0\n'
         content += mpstat_plot_block(data_unit, dir_title, old_files[3], new_files[3])
 
