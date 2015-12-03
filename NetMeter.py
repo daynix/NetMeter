@@ -194,7 +194,7 @@ class Connect:
             sys.exit(1)
 
 
-    def get_command(self, args, outfile = False):
+    def get_command(self, args, outfile = False, errfile = False):
         if args == 'stop_iperf':
             cmd = self.stop_iperf
         else:
@@ -206,7 +206,12 @@ class Connect:
             else:
                 self.print_cmd = ' '.join(self.auth) + ' "' + ' '.join(cmd) + '"'
 
-            return self.print_cmd, ' > ' + outfile
+            err_redirect = ''
+
+            if (errfile):
+                err_redirect = ' 2> ' + errfile
+
+            return self.print_cmd, ' > ' + outfile + err_redirect
 
         if self.rem_loc == 'local':
             return cmd
@@ -793,7 +798,7 @@ def run_server(protocol, p_size, init_name, dir_time, rem_loc):
     iperf_args = ['-s', '-i', '10', '-l', str(p_size), '-y', 'C']
     protocol_opts = set_protocol_opts(protocol, client = False)
     iperf_args += protocol_opts
-    iperf_command, output = Connect(rem_loc).get_command(iperf_args, init_name + '_iperf.dat')
+    iperf_command, output = Connect(rem_loc).get_command(iperf_args, init_name + '_iperf.dat', init_name + '_iperf.err')
     print('Starting ' + rem_loc + ' server...')
     cmd_print(iperf_command, rem_loc, dir_time)
     p = Popen(iperf_command + output, shell=True)
@@ -810,13 +815,13 @@ def run_client(server_addr, runtime, p_size, streams, init_name, dir_time, proto
                    '-P', str(streams)]
     protocol_opts = set_protocol_opts(protocol)
     iperf_args += protocol_opts
-    iperf_command = Connect(rem_loc).get_command(iperf_args)
+    iperf_command, output = Connect(rem_loc).get_command(iperf_args, init_name + '_iperf_client.out', init_name + '_iperf_client.err')
     direction_message = 'host to guest' if rem_loc == 'local' else 'guest to host'
     size_name = get_round_size_name(p_size)
     print(time_header() + 'Running ' + size_name + ' ' + direction_message + ' test. (Duration: '
           + str(timedelta(seconds = repetitions * 10 + mod)) + ')')
     cmd_print(iperf_command, rem_loc, dir_time)
-    iperf_proc = Popen(iperf_command)
+    iperf_proc = Popen(iperf_command + output, shell=True)
     mpstat_proc = Popen('mpstat -P ALL 10 ' + str(repetitions) + ' > ' + init_name + '_mpstat.dat', shell=True)
     mpstat_proc.wait()
     waitcount = 1  # Positive integer. Number of 10 sec intervals to wait for the client to finish.
