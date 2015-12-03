@@ -868,8 +868,10 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
     top_dir_name = timestamp + '_' + protocol + '_' + str(streams) + '_st'
     common_filename = protocol + '_' + str(streams) + '_st_' + timestamp
     print_unit = 'Buffer' if protocol == 'TCP' else 'Datagram'
-    dir_prep(join(export_dir, top_dir_name))
-    dir_time = join(export_dir, top_dir_name, common_filename)
+    raw_data_subdir="raw-data"
+    dir_prep(join(export_dir, top_dir_name, raw_data_subdir))
+    dir_time = join(export_dir, top_dir_name, raw_data_subdir, common_filename)
+    html_name = join(export_dir, top_dir_name, common_filename + ".html")
     h2g_images = []
     g2h_images = []
     all_h2g_failed = False
@@ -934,7 +936,7 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
                 print('Plotting...')
                 pr = Popen([gnuplot_bin, basename(init_name + '.plt')], cwd=dirname(dir_time))
                 pr.wait()
-                image_list.append(basename(init_name + '.png'))
+                image_list.append(join(raw_data_subdir, basename(init_name + '.png')))
                 iperf_tot.append([ yes_and_no(test_completed, server_fault), p, tot_iperf_mean,
                                   tot_iperf_stdev, hr_net_rate ])
                 print('============================================================')
@@ -963,8 +965,11 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
             all_g2h_failed = True
 
     print('Exporting html...')
-    gen_html(test_title, common_filename + '_h2g_summary.png', common_filename + '_g2h_summary.png', h2g_images,
-             g2h_images, dir_time + '.html', protocol, streams, all_h2g_failed, all_g2h_failed, print_unit)
+    gen_html(test_title,
+             join(raw_data_subdir, common_filename + '_h2g_summary.png'),
+             join(raw_data_subdir, common_filename + '_g2h_summary.png'),
+             h2g_images, g2h_images, html_name, protocol, streams,
+             all_h2g_failed, all_g2h_failed, print_unit)
 
 
 def run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, streams,

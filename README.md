@@ -80,7 +80,7 @@ All the generated scripts and files for this page are residing on [this branch](
 
 ## Looking at the results:
 
-Generally, the results are presented as plots on a generated html page. But all the raw, as well as the processed, data is saved. This is done for the scenarios when more manual interaction is needed. The files that are generated are:
+Generally, the results are presented as plots on a generated html page. But all the raw, as well as the processed, data is saved. This is done for the scenarios when more manual interaction is needed. All raw files are placed to `raw-data` subdirectory. The files that are generated are:
 
 (`<common>` = `<protocol>_<number of streams>_st_<date, time>`)
 

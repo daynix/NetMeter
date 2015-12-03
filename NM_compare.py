@@ -161,8 +161,9 @@ def mpstat_plot_block(data_unit, dir_title, old_datfile, new_datfile):
 
 
 def write_comp_gp(old_d, new_d, out_basename):
-    old_files, old_proto, old_streams = findfiles(old_d)
-    new_files, new_proto, new_streams = findfiles(new_d)
+    raw_data_subdir = "raw-data"
+    old_files, old_proto, old_streams = findfiles(join(old_d, raw_data_subdir))
+    new_files, new_proto, new_streams = findfiles(join(new_d, raw_data_subdir))
     old_name = sub('[^0-9a-zA-Z/]+', '-', old_d)
     new_name = sub('[^0-9a-zA-Z/]+', '-', new_d)
     if old_proto == new_proto == 'TCP':
