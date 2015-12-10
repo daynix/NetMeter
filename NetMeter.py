@@ -545,8 +545,10 @@ def get_iperf_data_single(iperf_out, protocol, streams, repetitions):
     iperf_data = np.array(iperf_data)
     conns = np.unique(iperf_data[:,1])
     num_conn = conns.shape[0]
-    if num_conn != streams:
+    if num_conn < streams:
         raise ValueError(str(num_conn) + ' out of ' + str(streams) + ' streams reached the server.')
+    elif num_conn > streams:
+        raise ValueError(str(num_conn) + ' connections reached the server (' + str(streams) + ' expected).')
 
     # Sort by connection number, then by date. Get indices of the result.
     bi_sorted_indices = np.lexsort((iperf_data[:,0], iperf_data[:,1]))
