@@ -589,16 +589,10 @@ def get_iperf_data_single(iperf_out, protocol, streams, repetitions):
             server_fault = 'too_many'
 
     ### End connection ammount check
-    #print(str(num_conn) + str(iperf_data.shape))
     iperf_data = iperf_data[:,[0,2]].reshape((num_conn, iperf_data.shape[0]/num_conn, 2))
     iperf_data = np.ma.masked_array(iperf_data, np.isnan(iperf_data))
-    #iperf_mean = np.mean(iperf_data, axis=0)
     mean_times = np.mean(iperf_data[:,:,0], axis=0)
-    #iperf_min = np.amin(iperf_data[:,:,1], axis=0).reshape(-1, 1)
-    #iperf_max = np.amax(iperf_data[:,:,1], axis=0).reshape(-1, 1)
-    #iperf_mean[:,0] = np.rint(iperf_mean[:,0])
     iperf_stdev = np.std(iperf_data[:,:,1], axis=0) * np.sqrt(num_conn)
-    #return np.hstack((iperf_mean,iperf_stdev)).filled(np.nan)
     out_arr = np.vstack((mean_times, iperf_data[:,:,1].sum(axis=0), iperf_stdev)).filled(np.nan).T
     return out_arr, out_arr[:,1].mean(), out_arr[:,1].std(), server_fault
 
@@ -633,9 +627,6 @@ def get_mpstat_data_single(mpstat_out):
     mpstat_data = (1 - mpstat_data / 100) / num_cpu
     tot_cpu_usage = mpstat_data.sum(axis=1)
     core_stdev = np.std(mpstat_data, axis=1) * np.sqrt(num_cpu)
-    #mpstat_mean = np.mean(mpstat_data, axis=1)
-    #mpstat_min = np.min(mpstat_data, axis=1)
-    #mpstat_max = np.max(mpstat_data, axis=1)
     out_arr = np.vstack((times, tot_cpu_usage, core_stdev)).T
     return out_arr, out_arr[:,1].mean(), out_arr[:,1].std()
 
