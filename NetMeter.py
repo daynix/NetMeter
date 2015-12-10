@@ -518,6 +518,7 @@ def get_iperf_data_single(iperf_out, protocol, streams, repetitions):
                 not tmp_lst[0].isdigit()
                 or len(tmp_lst) != (9 + additional_fields)
                 or (additional_fields and float(tmp_lst[-3]) <= 0)
+                or float(tmp_lst[-3 - additional_fields].split('-')[-1]) > repetitions * 10.0
                ):
                 continue
 
@@ -761,6 +762,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
                'rf = ' + rate_factor + '  # rate factor\n'
                + stats_calc + log2_scale +
                'set style fill transparent solid 0.2 noborder\n'
+               'set autoscale xfix\n'
                'plot ' + plot_net_data + labels_above_points + failed_labels +
                '     "' + proc_dat_file + '" using 1:($2-$3):($2+$3) with filledcurves lc rgb "red" axes x1y2 notitle, \\\n'
                '     "" using 1:2 with points pt 1 ps 1.5 lw 3 lc rgb "red" axes x1y2 title "Mean tot. CPU"\n'
@@ -809,7 +811,7 @@ def run_client(server_addr, runtime, p_size, streams, init_name, dir_time, proto
     p_size = bend_max_size(p_size, protocol)
     repetitions, mod = divmod(runtime, 10)
     if not mod:
-        runtime -= 1
+        runtime += 1
 
     iperf_args =  ['-c', server_addr, '-t', str(runtime), '-l', str(p_size),
                    '-P', str(streams)]
@@ -824,6 +826,7 @@ def run_client(server_addr, runtime, p_size, streams, init_name, dir_time, proto
     iperf_proc = Popen(iperf_command + output, shell=True)
     mpstat_proc = Popen('mpstat -P ALL 10 ' + str(repetitions) + ' > ' + init_name + '_mpstat.dat', shell=True)
     mpstat_proc.wait()
+    sleep(2)
     waitcount = 1  # Positive integer. Number of 10 sec intervals to wait for the client to finish.
     while iperf_proc.poll() == None:
         # iperf_proc.poll() may be "False" or "None". Here we want "None" specifically, thus "not iperf_proc.poll()" won't work.
@@ -998,7 +1001,7 @@ if __name__ == "__main__":
     Connect('remote')
     # Write message
     if (len(protocols) > 1) or (len(streams) > 1):
-        total_time = str(timedelta(seconds = (2 * len(test_range) * (run_duration + 30) + 20) *
+        total_time = str(timedelta(seconds = (2 * len(test_range) * (run_duration + 32) + 20) *
                          len(protocols) * len(streams)))
         print(time_header() + '\033[92mStarting tests for protocols: ' + ', '.join(protocols) + '.\033[0m')
         print(time_header() + '\033[92mUsing ' + ','.join(str(s) for s in streams) + ' stream(s).\033[0m')
