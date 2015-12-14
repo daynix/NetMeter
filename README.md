@@ -31,7 +31,7 @@ In order to run the NetMeter one needs:
 
 ## Options:
 
-For now, all the options are set at the beginning of the script file. They are all mandatory.  
+All the options are set in NetMeterConfig.py file, co-located with the main script. They are all mandatory.  
 These options are:
 
 * `export_dir`: [string] Export directory. The results will be saved there. (Example: `'/home/daynix/out'`)
