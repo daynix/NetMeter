@@ -891,7 +891,7 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
         iperf_tot = []
         mpstat_tot = []
         for p in p_sizes:
-            size_name = get_round_size_name(p)
+            size_name = format(p, '05d') + 'B'
             init_name = dir_time + '_' + direction + '_' + size_name
             iperf_sumname = dir_time + '_' + direction + '_iperf_summary'
             mpstat_sumname = dir_time + '_' + direction + '_mpstat_summary'
