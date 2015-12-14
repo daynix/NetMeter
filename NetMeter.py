@@ -788,9 +788,8 @@ def bend_max_size(size, protocol):
         return size
 
 
-def run_server(protocol, p_size, init_name, dir_time, rem_loc):
-    p_size = bend_max_size(p_size, protocol)
-    iperf_args = ['-s', '-i', '10', '-l', str(p_size), '-y', 'C']
+def run_server(protocol, init_name, dir_time, rem_loc):
+    iperf_args = ['-s', '-i', '10', '-y', 'C']
     protocol_opts = set_protocol_opts(protocol, client = False)
     iperf_args += protocol_opts
     iperf_command, output = Connect(rem_loc).get_command(iperf_args, init_name + '_iperf.dat', init_name + '_iperf.err')
@@ -899,7 +898,7 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
             combined_sumname = dir_time + '_' + direction + '_summary'
             try:
                 print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-                run_server(protocol, p, init_name, dir_time, server_loc)
+                run_server(protocol, init_name, dir_time, server_loc)
                 test_completed, repetitions = run_client(server_addr, runtime, p, streams,
                                                          init_name, dir_time, protocol,
                                                          client_loc)
