@@ -17,6 +17,7 @@ from os.path import isdir, join
 from os import makedirs, listdir
 from datetime import datetime
 from subprocess import Popen
+from glob import glob
 
 ########### May requires changing  #############
 gnuplot_path = r'gnuplot'
@@ -250,7 +251,9 @@ def main():
         sys.exit(1)
 
     olddirs = sys.argv[1].split(',')
+    olddirs = [glob(d)[0] for d in olddirs]
     newdirs = sys.argv[2].split(',')
+    newdirs = [glob(d)[0] for d in newdirs]
     outdir = sys.argv[3]
 
     if len(olddirs) != len(newdirs):
