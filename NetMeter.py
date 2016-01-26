@@ -89,7 +89,7 @@ logo = (
        )
 
 
-class Connect:
+class Connect(object):
     def __init__(self, rem_loc):
         try:
             Connect.conn_type
