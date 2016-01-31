@@ -403,15 +403,17 @@ def get_size_units_factor(num, rate=False):
     factor = 1.0
     if rate:
         s = 'b/s'
+        thousand = 1000.0
     else:
         s = 'B'
+        thousand = 1024.0
 
     for x in ['' + s, 'K' + s, 'M' + s, 'G' + s]:
-        if num < 1024.0:
+        if num < thousand:
             return "%3.2f" % num, x, str(factor)
 
-        num /= 1024.0
-        factor *= 1024.0
+        num /= thousand
+        factor *= thousand
 
     return "%3.2f" % num, 'T' + s, str(factor)
 

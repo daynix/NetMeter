@@ -78,11 +78,11 @@ def findfiles(d):
 def get_rate_factor(n):
     factor = 1.0
     for x in ['b/s', 'Kb/s', 'Mb/s', 'Gb/s']:
-        if n < 1024.0:
+        if n < 1000.0:
             return x, factor
 
-        n /= 1024.0
-        factor *= 1024.0
+        n /= 1000.0
+        factor *= 1000.0
 
     return 'Tb/s', factor
 
