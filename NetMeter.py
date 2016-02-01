@@ -90,41 +90,48 @@ logo = (
 
 
 class Connect(object):
-    def __init__(self, rem_loc):
-        try:
-            Connect.conn_type
-        except AttributeError:
-            self.verify_credsfile()
-
-        self.rem_loc = rem_loc
-        if self.rem_loc == 'local':
-            self.iperf_cmd = [local_iperf]
-            self.stop_iperf = ['killall', '-9', basename(local_iperf)]
-        elif self.rem_loc == 'remote' and Connect.conn_type == 'ssh':
-            self.auth = [access_method, '-i', Connect.key, '-p', ssh_port, '-l', Connect.username,
+    def __init__(self, access_method, ip, conn_name, iperf_bin, ssh_port = 22,
+                 creds = None):
+        self.conn_type = basename(access_method)
+        self.conn_name = conn_name
+        self.creds = creds
+        self.verify_credsfile()
+        if self.conn_type == 'local':
+            self.iperf_cmd = [iperf_bin]
+            self.stop_iperf = ['killall', '-9', basename(iperf_bin)]
+        elif self.conn_type == 'ssh':
+            self.auth = [access_method, '-i', self.key, '-p', str(ssh_port), '-l', self.username,
                          '-o', 'UserKnownHostsFile=/dev/null', '-o', 'StrictHostKeyChecking=no',
-                         '-o', 'BatchMode=yes', '-o', 'LogLevel=ERROR', remote_addr]
-            self.iperf_cmd = [remote_iperf]
-            self.stop_iperf = ['killall', '-9', basename(remote_iperf)]
+                         '-o', 'BatchMode=yes', '-o', 'LogLevel=ERROR', ip]
+            self.iperf_cmd = [iperf_bin]
+            self.stop_iperf = ['killall', '-9', basename(iperf_bin)]
             self.shutdown_command = ['sudo', 'shutdown', '-h', 'now']
-        elif self.rem_loc == 'remote' and Connect.conn_type == 'winexe':
-            self.auth = [access_method, '-A',  creds, '//' + remote_addr]
-            self.iperf_cmd = [remote_iperf]
-            self.stop_iperf = ['taskkill /im ' + basename(remote_iperf) + ' /f']
+        elif self.conn_type == 'winexe':
+            self.auth = [access_method, '-A',  self.creds, '//' + ip]
+            self.iperf_cmd = [iperf_bin]
+            self.stop_iperf = ['taskkill /im ' + basename(iperf_bin) + ' /f']
             self.shutdown_command = ['shutdown /t 10 /s /f']
         else:
             print('\033[91mConnection method not supported.\033[0m Exiting.')
             sys.exit(1)
 
+    def islocal(self):
+        if self.conn_type == 'local':
+            return True
+        else:
+            return False
 
-    def get_command(self, args, outfile = False, errfile = False):
+    def getname(self):
+        return self.conn_name
+
+    def get_command(self, args, outfile = None, errfile = None):
         if args == 'stop_iperf':
             cmd = self.stop_iperf
         else:
             cmd = self.iperf_cmd + args
 
         if outfile:
-            if self.rem_loc == 'local':
+            if self.conn_type == 'local':
                 self.print_cmd = ' '.join(cmd)
             else:
                 self.print_cmd = ' '.join(self.auth) + ' "' + ' '.join(cmd) + '"'
@@ -136,63 +143,58 @@ class Connect(object):
 
             return self.print_cmd, ' > ' + outfile + err_redirect
 
-        if self.rem_loc == 'local':
+        if self.conn_type == 'local':
             return cmd
         else:
             return self.auth + [' '.join(cmd)]
 
-
     def shutdown(self):
-        if self.rem_loc == 'remote':
-            print('Shutting down the guest...')
-            if Connect.conn_type == 'ssh':
+        if self.conn_type != 'local':
+            print('Shutting down ' + self.conn_name + '...')
+            if self.conn_type == 'ssh':
                 self.auth = self.auth[:-1] + ['-t'] + [self.auth[-1]]
 
             p = Popen(self.auth + self.shutdown_command)
             p.wait()
             sleep(10)
-        else:
-            print('\033[91mYou asked to shut down the host. It must be a mistake!\033[0m')
-
 
     def verify_credsfile(self):
-        if not isfile(creds):
-            print('\033[91mCredentials file "' + creds + '" not found.\033[0m Exiting.')
+        if self.conn_type != 'local' and (not isfile(self.creds)):
+            print('\033[91mCredentials file "' + self.creds + '" not found.\033[0m Exiting.')
             sys.exit(1)
 
-        Connect.conn_type = basename(access_method)
-        if Connect.conn_type == 'ssh':
-            with open(creds) as c:
+        if self.conn_type == 'ssh':
+            with open(self.creds) as c:
                 try:
                     credsline = c.readline().strip().split('=', maxsplit=1)
                     if credsline[0].strip() == 'username':
-                        Connect.username = credsline[1].strip()
+                        self.username = credsline[1].strip()
                     else:
                         raise
 
                     credsline = c.readline().strip().split('=', maxsplit=1)
                     if credsline[0].strip() == 'key':
-                        Connect.key = credsline[1].strip()
+                        self.key = credsline[1].strip()
                     else:
                         raise
 
                 except:
                     print('\033[91mError: Please verify that the username and the key '
-                          'are specified correctly in the creds file!\033[0m')
+                          'are specified correctly in ' + self.creds +'!\033[0m')
                     sys.exit(1)
 
-            if not isfile(Connect.key):
+            if not isfile(self.key):
                 print('\033[93mSSH key file not found.\033[0m')
                 create_key_trys = 4
                 while create_key_trys:
-                    ns = input('Create the keypair "' + Connect.key + '*" and transfer it to the guest? (Y/n) ')
+                    ns = input('Create the keypair "' + self.key + '*" and transfer it to ' + self.conn_name + '? (Y/n) ')
                     if ns in ['', 'Y', 'y']:
                         p = Popen(['ssh-keygen', '-t', 'rsa', '-b', '4096', '-f',
-                                   Connect.key, '-N', '', '-C',
+                                   self.key, '-N', '', '-C',
                                    '"NetMeter_test-' + rundate + '"'])
                         p.wait()
-                        p = Popen(['ssh-copy-id', '-i', Connect.key + '.pub', '-p',
-                                   ssh_port, Connect.username + '@' + remote_addr])
+                        p = Popen(['ssh-copy-id', '-i', self.key + '.pub', '-p',
+                                   str(ssh_port), self.username + '@' + ip])
                         p.wait()
                         print('OK')
                         break
@@ -232,7 +234,7 @@ def dir_prep(d):
     print('The output directory is set to: \033[93m' + d + '\033[0m')
 
 
-def cmd_print(text, rem_loc, dir_time):
+def cmd_print(text, conn_name, dir_time):
     if isinstance(text, str):
         # The command is a string
         print_cmd = text
@@ -254,7 +256,7 @@ def cmd_print(text, rem_loc, dir_time):
         print_cmd = ' '.join(print_cmd)
 
     with open(dir_time + '_iperf_commands.log', 'a') as logfile:
-            logfile.write(time_header() + rem_loc[:3] + ': ' + print_log + '\n')
+            logfile.write(time_header() + conn_name + ': ' + print_log + '\n')
 
     if debug:
         print('####### Debug mode on #######\n' +
@@ -262,13 +264,14 @@ def cmd_print(text, rem_loc, dir_time):
               '#############################')
 
 
-def place_images(direction, protocol, summary_img, image_list, print_unit, all_failed = False):
-    if direction == 'h2g':
-        from_dev = 'Host'
-        to_dev = 'Guest'
+def place_images(direction, protocol, summary_img, image_list, print_unit,
+                 cl1_pretty_name, cl2_pretty_name, all_failed = False):
+    if direction == 'one2two':
+        from_dev = cl1_pretty_name
+        to_dev = cl2_pretty_name
     else:
-        from_dev = 'Guest'
-        to_dev = 'Host'
+        from_dev = cl2_pretty_name
+        to_dev = cl1_pretty_name
 
     content = (
                '    <div id=' + direction + '>\n'
@@ -304,8 +307,14 @@ def place_images(direction, protocol, summary_img, image_list, print_unit, all_f
     return content
 
 
-def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outname,
-             protocol, streams, all_h2g_failed, all_g2h_failed, print_unit):
+def gen_html(title, one2two_summary, two2one_summary, one2two_images, two2one_images, html_outname,
+             protocol, streams, all_one2two_failed, all_two2one_failed, print_unit, localpart,
+             cl1_pretty_name, cl2_pretty_name):
+    if localpart:
+        CPU_note = 'and CPU '
+    else:
+        CPU_note = ''
+
     content = (
                '<!doctype html>\n'
                '<html>\n'
@@ -334,14 +343,14 @@ def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outna
                '    background-repeat: no-repeat;\n'
                '    background-position: 10px 50%;\n'
                '}\n'
-               '#h2g {\n'
+               '#one2two {\n'
                '    width: 50%;\n'
                '    float: left;\n'
                '    height: auto !important;\n'
                '    height: 100%;\n'
                '    min-height: 100%;\n'
                '}\n'
-               '#g2h {\n'
+               '#two2one {\n'
                '    background-color: #ffffee;\n'
                '    width: 50%;\n'
                '    float: right;\n'
@@ -376,7 +385,8 @@ def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outna
                '    margin: 0px;\n'
                '}\n'
                '</style>\n'
-               '<title>Iperf Host &#8596; Guest Bandwidth and CPU Usage Report</title>\n'
+               '<title>Iperf ' + cl1_pretty_name + ' &#8596; ' + cl2_pretty_name
+               + ' Bandwidth ' + CPU_note + 'Performance Report</title>\n'
                '</head>\n'
                '<body>\n'
                '<div id="header">\n'
@@ -385,8 +395,12 @@ def gen_html(title, h2g_summary, g2h_summary, h2g_images, g2h_images, html_outna
                 '</div>\n'
                 '<div id="container">\n'
                )
-    content += place_images('h2g', protocol, h2g_summary, h2g_images, print_unit, all_h2g_failed)
-    content += place_images('g2h', protocol, g2h_summary, g2h_images, print_unit, all_g2h_failed)
+    content += place_images('one2two', protocol, one2two_summary, one2two_images,
+                            print_unit, cl1_pretty_name, cl2_pretty_name,
+                            all_one2two_failed)
+    content += place_images('two2one', protocol, two2one_summary, two2one_images,
+                            print_unit, cl1_pretty_name, cl2_pretty_name,
+                            all_two2one_failed)
     content += (
                 '</div>\n'
                 '<div id="footer">\n'
@@ -606,8 +620,9 @@ def plot_iperf_data(passed, plot_type, net_dat_file):
         return for_all_areas[1] + for_all_points[3]
 
 
-def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protocol, streams, print_unit,
-             plot_type = 'singlesize', direction = 'h2g', finished = True,
+def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate,
+             protocol, streams, print_unit, cl1_pretty_name, cl2_pretty_name,
+             plot_type = 'singlesize', direction = 'one2two', finished = True,
              server_fault = False, packet_size = 0.0):
     try:
         net_rate, rate_units, rate_factor = get_size_units_factor(net_rate, rate=True)
@@ -646,10 +661,22 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
                    ': (x < 1048576.0 ? sprintf("%.0fKB", x/1024.0) '
                    ': sprintf("%.0fMB", x/1048576.0))\n')
 
-    if direction == 'h2g':
-        plot_subtitle = 'Host to Guest'
+    if direction == 'one2two':
+        plot_subtitle = cl1_pretty_name + ' to ' + cl2_pretty_name
     else:
-        plot_subtitle = 'Guest to Host'
+        plot_subtitle = cl1_pretty_name + ' to ' + cl2_pretty_name
+
+    if proc_dat_file:
+        proc_plot = ('     "' + proc_dat_file + '" using 1:($2-$3):($2+$3) with filledcurves lc rgb "red" axes x1y2 notitle, \\\n'
+                     '     "" using 1:2 with points pt 1 ps 1.5 lw 3 lc rgb "red" axes x1y2 title "Mean tot. CPU"\n')
+        y2_axis = ('set y2label "CPU busy time fraction"\n'
+                   'set y2tics nomirror\n'
+                   'set y2range [0:1]\n')
+        rmargin = ''
+    else:
+        proc_plot = ''
+        y2_axis = ''
+        rmargin = 'set rmargin 4.5\n'
 
     warning_message = ''
     if not finished:
@@ -662,7 +689,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
     plot_net_data = plot_iperf_data(server_fault, plot_type, net_dat_file)
     content = (
                'set terminal pngcairo nocrop enhanced size 1024,768 font "Verdana,15"\n'
-               'set output "' + img_file +'"\n'
+               'set output "' + img_file + '"\n'
                '\n'
                'set title "{/=20 ' + plot_title + '}\\n\\n{/=18 (' + plot_subtitle + ', ' + protocol + ', ' + str(streams) + ' st.)}"\n'
                + rate_format + warning_message +
@@ -670,20 +697,16 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate, protoc
                'set xlabel "' + x_title + '"\n'
                'set ylabel "Bandwidth (' + rate_units + ')"\n'
                'set ytics nomirror\n'
-               'set y2label "CPU busy time fraction"\n'
-               'set y2tics nomirror\n'
-               'set y2range [0:1]\n'
+               + y2_axis +
                'set key bmargin center horizontal box samplen 1 width -1\n'
-               'set bmargin 4.6\n'
+               'set bmargin 4.6\n' + rmargin
                + rotate_xtics + formatx +
                '\n'
                'rf = ' + rate_factor + '  # rate factor\n'
                + stats_calc + log2_scale +
                'set style fill transparent solid 0.2 noborder\n'
                'set autoscale xfix\n'
-               'plot ' + plot_net_data + labels_above_points + failed_labels +
-               '     "' + proc_dat_file + '" using 1:($2-$3):($2+$3) with filledcurves lc rgb "red" axes x1y2 notitle, \\\n'
-               '     "" using 1:2 with points pt 1 ps 1.5 lw 3 lc rgb "red" axes x1y2 title "Mean tot. CPU"\n'
+               'plot ' + plot_net_data + labels_above_points + failed_labels + proc_plot
               )
     with open(gp_outname, 'w') as outfile:
         outfile.write(content)
@@ -713,18 +736,20 @@ def bend_max_size(size, protocol):
         return size
 
 
-def run_server(protocol, init_name, dir_time, rem_loc):
+def run_server(protocol, init_name, dir_time, conn):
     iperf_args = ['-s', '-i', '10', '-y', 'C']
     protocol_opts = set_protocol_opts(protocol, client = False)
     iperf_args += protocol_opts
-    iperf_command, output = Connect(rem_loc).get_command(iperf_args, init_name + '_iperf.dat', init_name + '_iperf.err')
-    print('Starting ' + rem_loc + ' server...')
-    cmd_print(iperf_command, rem_loc, dir_time)
+    conn_name = conn.getname()
+    iperf_command, output = conn.get_command(iperf_args, init_name + '_iperf.dat', init_name + '_iperf.err')
+    print('Starting server on ' + conn_name + '...')
+    cmd_print(iperf_command, conn_name, dir_time)
     p = Popen(iperf_command + output, shell=True)
     sleep(10)
 
 
-def run_client(server_addr, runtime, p_size, streams, init_name, dir_time, protocol, rem_loc):
+def run_client(server_addr, runtime, p_size, streams, init_name, dir_time,
+               protocol, conn, localpart):
     p_size = bend_max_size(p_size, protocol)
     repetitions, mod = divmod(runtime, 10)
     if not mod:
@@ -734,15 +759,20 @@ def run_client(server_addr, runtime, p_size, streams, init_name, dir_time, proto
                    '-P', str(streams)]
     protocol_opts = set_protocol_opts(protocol)
     iperf_args += protocol_opts
-    iperf_command, output = Connect(rem_loc).get_command(iperf_args, init_name + '_iperf_client.out', init_name + '_iperf_client.err')
-    direction_message = 'host to guest' if rem_loc == 'local' else 'guest to host'
+    iperf_command, output = conn.get_command(iperf_args, init_name + '_iperf_client.out', init_name + '_iperf_client.err')
+    source_name = conn.getname()
     size_name = get_round_size_name(p_size)
-    print(time_header() + 'Running ' + size_name + ' ' + direction_message + ' test. (Duration: '
+    print(time_header() + 'Running ' + size_name + ' test from ' + source_name + '. (Duration: '
           + str(timedelta(seconds = repetitions * 10 + mod)) + ')')
-    cmd_print(iperf_command, rem_loc, dir_time)
+    conn_name = conn.getname()
+    cmd_print(iperf_command, conn_name, dir_time)
     iperf_proc = Popen(iperf_command + output, shell=True)
-    mpstat_proc = Popen('mpstat -P ALL 10 ' + str(repetitions) + ' > ' + init_name + '_mpstat.dat', shell=True)
-    mpstat_proc.wait()
+    if localpart:
+        mpstat_proc = Popen('mpstat -P ALL 10 ' + str(repetitions) + ' > ' + init_name + '_mpstat.dat', shell=True)
+        mpstat_proc.wait()
+    else:
+        sleep(10 * repetitions)
+
     sleep(2)
     waitcount = 1  # Positive integer. Number of 10 sec intervals to wait for the client to finish.
     while iperf_proc.poll() == None:
@@ -765,10 +795,11 @@ def run_client(server_addr, runtime, p_size, streams, init_name, dir_time, proto
         return False, repetitions
 
 
-def stop_server(rem_loc, dir_time):
-    iperf_stop_command = Connect(rem_loc).get_command('stop_iperf')
-    print('Stopping previous ' + rem_loc  + ' Iperf instances...')
-    cmd_print(iperf_stop_command, rem_loc, dir_time)
+def stop_server(conn, dir_time):
+    conn_name = conn.getname()
+    iperf_stop_command = conn.get_command('stop_iperf')
+    print('Stopping previous Iperf instances on ' + conn_name + '...')
+    cmd_print(iperf_stop_command, conn_name, dir_time)
     p = Popen(iperf_stop_command, stdout=PIPE, stderr=PIPE)
     p.wait()
     out, err = p.communicate()
@@ -781,8 +812,8 @@ def stop_server(rem_loc, dir_time):
     sleep(10)
 
 
-def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
-              test_title, protocol, export_dir):
+def run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime, p_sizes,
+              streams, timestamp, test_title, protocol, export_dir):
     series_time = str(timedelta(seconds = 2 * len(p_sizes) * (runtime + 30) + 20))
     print(time_header() + '\033[92mStarting ' + protocol + ' tests.\033[0m Expected run time: ' + series_time)
     top_dir_name = timestamp + '_' + protocol + '_' + str(streams) + '_st'
@@ -792,26 +823,23 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
     dir_prep(join(export_dir, top_dir_name, raw_data_subdir))
     dir_time = join(export_dir, top_dir_name, raw_data_subdir, common_filename)
     html_name = join(export_dir, top_dir_name, common_filename + ".html")
-    h2g_images = []
-    g2h_images = []
-    all_h2g_failed = False
-    all_g2h_failed = False
-    stop_server('local', dir_time)
-    stop_server('remote', dir_time)
-    for direction in ['h2g', 'g2h']:
-        if direction == 'h2g':
-            server_addr = remote_addr
-            server_loc = 'remote'
-            client_loc = 'local'
-            image_list = h2g_images
-            plot_message = 'Plotting host --> guest summary...'
-        else:
-            server_addr = local_addr
-            server_loc = 'local'
-            client_loc = 'remote'
-            image_list = g2h_images
-            plot_message = 'Plotting guest --> host summary...'
+    one2two_images = []
+    two2one_images = []
+    all_one2two_failed = False
+    all_two2one_failed = False
+    stop_server(cl1_conn, dir_time)
+    stop_server(cl2_conn, dir_time)
+    if cl1_conn.islocal() or cl2_conn.islocal():
+        localpart = True
+    else:
+        localpart = False
 
+    connlist = [
+                [cl1_conn, cl2_conn, 'one2two', cl2_test_ip, one2two_images, 'Plotting cl1 --> cl2 summary...'],
+                [cl2_conn, cl1_conn, 'two2one', cl1_test_ip, two2one_images, 'Plotting cl2 --> cl1 summary...']
+               ]
+    for c in connlist:
+        [client_conn, server_conn, direction, server_addr, image_list, plot_message] = c
         tot_iperf_mean = -1.0
         iperf_tot = []
         mpstat_tot = []
@@ -823,14 +851,20 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
             combined_sumname = dir_time + '_' + direction + '_summary'
             try:
                 print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-                run_server(protocol, init_name, dir_time, server_loc)
+                run_server(protocol, init_name, dir_time, server_conn)
                 test_completed, repetitions = run_client(server_addr, runtime, p, streams,
                                                          init_name, dir_time, protocol,
-                                                         client_loc)
-                stop_server(server_loc, dir_time)
+                                                         client_conn, localpart)
+                stop_server(server_conn, dir_time)
                 print('Parsing results...')
-                mpstat_array, tot_mpstat_mean, tot_mpstat_stdev = get_mpstat_data_single(init_name + '_mpstat.dat')
-                mpstat_tot.append([ p, tot_mpstat_mean, tot_mpstat_stdev ])
+                if localpart:
+                    mpstat_array, tot_mpstat_mean, tot_mpstat_stdev = get_mpstat_data_single(init_name + '_mpstat.dat')
+                    mpstat_tot.append([ p, tot_mpstat_mean, tot_mpstat_stdev ])
+                    export_single_data(mpstat_array, init_name + '_mpstat_processed.dat')
+                    mpstat_single_file = basename(init_name + '_mpstat_processed.dat')
+                else:
+                    mpstat_single_file = None
+
                 (iperf_array, tot_iperf_mean, tot_iperf_stdev, server_fault) =\
                 get_iperf_data_single(init_name + '_iperf.dat', protocol, streams, repetitions)
                 if server_fault == 'too_few':
@@ -848,10 +882,10 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
                     hr_net_rate = tot_iperf_mean / float(rate_factor)
 
                 export_single_data(iperf_array, init_name + '_iperf_processed.dat')
-                export_single_data(mpstat_array, init_name + '_mpstat_processed.dat')
                 write_gp(init_name + '.plt', basename(init_name + '_iperf_processed.dat'),
-                         basename(init_name + '_mpstat_processed.dat'), basename(init_name + '.png'),
-                         tot_iperf_mean, protocol, streams, print_unit, plot_type = 'singlesize', direction = direction,
+                         mpstat_single_file, basename(init_name + '.png'),
+                         tot_iperf_mean, protocol, streams, print_unit, cl1_pretty_name,
+                         cl2_pretty_name, plot_type = 'singlesize', direction = direction,
                          finished = test_completed, server_fault = server_fault, packet_size = p)
                 print('Plotting...')
                 pr = Popen([gnuplot_bin, basename(init_name + '.plt')], cwd=dirname(dir_time))
@@ -870,41 +904,52 @@ def run_tests(remote_addr, local_addr, runtime, p_sizes, streams, timestamp,
             print(plot_message)
             np.savetxt(iperf_sumname + '.dat', iperf_tot, fmt='%g',
                        header= 'TestOK ' + print_unit + 'Size(B) BW(b/s) Stdev(b/s) BW(' + rate_units + ')')
-            np.savetxt(mpstat_sumname + '.dat', mpstat_tot, fmt='%g', header= print_unit + 'Size(B) Frac Stdev')
+            if localpart:
+                np.savetxt(mpstat_sumname + '.dat', mpstat_tot, fmt='%g', header= print_unit + 'Size(B) Frac Stdev')
+                mpstat_ser_file = basename(mpstat_sumname + '.dat')
+            else:
+                mpstat_ser_file = None
+
             non_failed_BW = [l[2] for l in iperf_tot if l[2]]
             tot_iperf_mean = sum(non_failed_BW)/len(non_failed_BW)
             write_gp(combined_sumname + '.plt', basename(iperf_sumname + '.dat'),
-                     basename(mpstat_sumname + '.dat'), basename(combined_sumname + '.png'),
-                     tot_iperf_mean, protocol, streams, print_unit, plot_type = 'multisize', direction = direction,
+                     mpstat_ser_file, basename(combined_sumname + '.png'),
+                     tot_iperf_mean, protocol, streams, print_unit, cl1_pretty_name,
+                     cl2_pretty_name, plot_type = 'multisize', direction = direction,
                      server_fault = np.array(iperf_tot)[:,0], packet_size = np.mean(p_sizes))
             pr = Popen([gnuplot_bin, basename(combined_sumname + '.plt')], cwd=dirname(dir_time))
             pr.wait()
-        elif direction == 'h2g':
-            all_h2g_failed = True
+        elif direction == 'one2two':
+            all_one2two_failed = True
         else:
-            all_g2h_failed = True
+            all_two2one_failed = True
 
     print('Exporting html...')
     gen_html(test_title,
-             join(raw_data_subdir, common_filename + '_h2g_summary.png'),
-             join(raw_data_subdir, common_filename + '_g2h_summary.png'),
-             h2g_images, g2h_images, html_name, protocol, streams,
-             all_h2g_failed, all_g2h_failed, print_unit)
+             join(raw_data_subdir, common_filename + '_one2two_summary.png'),
+             join(raw_data_subdir, common_filename + '_two2one_summary.png'),
+             one2two_images, two2one_images, html_name, protocol, streams,
+             all_one2two_failed, all_two2one_failed, print_unit, localpart,
+             cl1_pretty_name, cl2_pretty_name)
 
 
-def run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, streams,
-                            timestamp, test_title, protocols, export_dir):
+def run_tests_for_protocols(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip,
+                            runtime, p_sizes, streams, timestamp, test_title,
+                            protocols, export_dir):
     for p in protocols:
-        run_tests(remote_addr, local_addr, runtime, p_sizes,
-                  streams, timestamp, test_title, p, export_dir)
+        run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime,
+                  p_sizes, streams, timestamp, test_title, p, export_dir)
 
 
-def run_tests_for_streams(remote_addr, local_addr, runtime, p_sizes, streams,
-                          timestamp, test_title, protocols, export_dir):
+def run_tests_for_streams(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip,
+                          runtime, p_sizes, streams, timestamp, test_title,
+                          protocols, export_dir):
     for s in streams:
         if str(s).isdigit():
-            run_tests_for_protocols(remote_addr, local_addr, runtime, p_sizes, s,
-                                    timestamp, test_title, protocols, export_dir)
+            run_tests_for_protocols(cl1_conn, cl2_conn, cl1_test_ip,
+                                    cl2_test_ip, runtime, p_sizes, s,
+                                    timestamp, test_title, protocols,
+                                    export_dir)
         else:
             print('\033[91mERROR:\033[0m Can not test for ' + s +
                   ' streams. Please verify that the number of streams is a positive integer.')
@@ -914,8 +959,9 @@ def run_tests_for_streams(remote_addr, local_addr, runtime, p_sizes, streams,
 if __name__ == "__main__":
     # Interrupt handling
     signal.signal(signal.SIGINT, interrupt_exit)
-    # Verifying credsfile existence
-    Connect('remote')
+    # Getting connections
+    cl1_conn = Connect(access_method_cl1, cl1_conn_ip, 'cl1', cl1_iperf, ssh_port_cl1, creds_cl1)
+    cl2_conn = Connect(access_method_cl2, cl2_conn_ip, 'cl2', cl1_iperf, ssh_port_cl2, creds_cl2)
     # Write message
     if (len(protocols) > 1) or (len(streams) > 1):
         total_time = str(timedelta(seconds = (2 * len(test_range) * (run_duration + 32) + 20) *
@@ -925,8 +971,11 @@ if __name__ == "__main__":
         print(time_header() + '\033[92mExpected total run time: \033[0m' + '\033[91m' + total_time + '\033[0m')
 
     # Run tests
-    run_tests_for_streams(remote_addr, local_addr, run_duration, test_range,
-                          streams, rundate, title, protocols, export_dir)
-    # Shut down the guest if needed
+    run_tests_for_streams(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip,
+                          run_duration, test_range, streams, rundate, title,
+                          protocols, export_dir)
+    # Shut down the clients if needed.
+    # IF ONE OF THE CLIENTS IS LOCAL, IT WILL NOT SHUT DOWN.
     if shutdown:
-        Connect('remote').shutdown()
+        cl1_conn.shutdown()
+        cl2_conn.shutdown()

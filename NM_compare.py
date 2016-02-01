@@ -36,11 +36,11 @@ logo_name_location = 'screen 0.94, screen 0.945'
 rundate = datetime.now().strftime('%Y_%m_%d_%H-%M-%S')
 
 def findfiles(d):
-    h2g_iperf = [f for f in listdir(d) if f.endswith('h2g_iperf_summary.dat')]
-    h2g_mpstat = [f for f in listdir(d) if f.endswith('h2g_mpstat_summary.dat')]
-    g2h_iperf = [f for f in listdir(d) if f.endswith('g2h_iperf_summary.dat')]
-    g2h_mpstat = [f for f in listdir(d) if f.endswith('g2h_mpstat_summary.dat')]
-    filelist = [h2g_iperf, h2g_mpstat, g2h_iperf, g2h_mpstat]
+    one2two_iperf = [f for f in listdir(d) if f.endswith('one2two_iperf_summary.dat')]
+    one2two_mpstat = [f for f in listdir(d) if f.endswith('one2two_mpstat_summary.dat')]
+    two2one_iperf = [f for f in listdir(d) if f.endswith('two2one_iperf_summary.dat')]
+    two2one_mpstat = [f for f in listdir(d) if f.endswith('two2one_mpstat_summary.dat')]
+    filelist = [one2two_iperf, one2two_mpstat, two2one_iperf, two2one_mpstat]
     protocols = [False for i in range(4)]
     streams = [False for i in range(4)]
     for i in range(4):
@@ -149,16 +149,28 @@ def iperf_plot_block(data_unit, dir_title, old_datfile, new_datfile):
 
 
 def mpstat_plot_block(data_unit, dir_title, old_datfile, new_datfile):
-    return (
-            'set ylabel "CPU busy time fraction"\n'
-            'set xlabel "' + data_unit + '"\n'
-            'set yrange [0:1]\n'
-            'set title "{/=18 ' + dir_title + '}"\n'
-            'plot "' + old_datfile + '" using 1:($2-$3):($2+$3) with filledcurves lc rgb "red" notitle, \\\n'
-            '     "" using 1:2:xtic(printxsizes($1)) with points pt 1 ps 0.8 lw 4 lc rgb "red" title "Mean tot. CPU - old", \\\n'
-            '     "' + new_datfile + '" using 1:($2-$3):($2+$3) with filledcurves lc rgb "blue" notitle, \\\n'
-            '     "" using 1:2:xtic(printxsizes($1)) with points pt 1 ps 0.8 lw 3 lc rgb "blue" title "Mean tot. CPU - new"\n'
-           )
+    if old_datfile and new_datfile:
+        content = (
+                   'set ylabel "CPU busy time fraction"\n'
+                   'set xlabel "' + data_unit + '"\n'
+                   'set yrange [0:1]\n'
+                   'set title "{/=18 ' + dir_title + '}"\n'
+                   'plot "' + old_datfile + '" using 1:($2-$3):($2+$3) with'
+                   ' filledcurves lc rgb "red" notitle, \\\n'
+                   '     "" using 1:2:xtic(printxsizes($1)) with points pt 1'
+                   ' ps 0.8 lw 4 lc rgb "red" title "Mean tot. CPU - old", \\\n'
+                   '     "' + new_datfile + '" using 1:($2-$3):($2+$3) with'
+                   ' filledcurves lc rgb "blue" notitle, \\\n'
+                   '     "" using 1:2:xtic(printxsizes($1)) with points pt 1'
+                   ' ps 0.8 lw 3 lc rgb "blue" title "Mean tot. CPU - new"\n'
+                  )
+    else:
+        content = (
+                   'set object rectangle from screen 0.52,0.05 to screen 0.96,0.845 behind fc rgb "#ffffee"\n'
+                   'set label "{/=30 No CPU results found}" at screen 0.74, screen 0.47 center\n'
+                  )
+
+    return content
 
 
 def write_comp_gp(old_d, new_d, out_basename):
@@ -174,8 +186,8 @@ def write_comp_gp(old_d, new_d, out_basename):
     else:
         data_unit = 'Buffer/Datagram'
 
-    h2g_block = True
-    g2h_block = True
+    one2two_block = True
+    two2one_block = True
     content = (
                'set terminal pdfcairo color enhanced rounded size 29.7cm,21.0cm font "Verdana,15"\n'
                'set output "' + out_basename + '.pdf"\n'
@@ -198,42 +210,42 @@ def write_comp_gp(old_d, new_d, out_basename):
                'set label "' + logo_name + '" at ' + logo_name_location + ' center\n'
                '\n'
               )
-    if (not all(old_files[2:])) or (not all(new_files[2:])):
+    if (not old_files[2]) or (not new_files[2]):
         content += 'set object rectangle from screen 0,0.45 to screen 1.0,0.88 behind fc rgb "#ffcccc"\n'
-        h2g_block = False
+        one2two_block = False
 
-    if not all(new_files[2:]):
-        content += 'set label "{/=30 No new host-to-guest results found}" at screen 0.5, screen 0.72 center\n'
+    if not new_files[2]:
+        content += 'set label "{/=30 No new Ctient 1 to Client 2 results found}" at screen 0.5, screen 0.72 center\n'
 
-    if not all(old_files[2:]):
-        content += 'set label "{/=30 No old host-to-guest results found}" at screen 0.5, screen 0.68 center\n'
+    if not old_files[2]:
+        content += 'set label "{/=30 No old Ctient 1 to Client 2 results found}" at screen 0.5, screen 0.68 center\n'
 
-    if not h2g_block:
+    if not one2two_block:
         content += '\n'
 
-    if (not all(old_files[:2])) or (not all(new_files[:2])):
+    if (not old_files[0]) or (not new_files[0]):
         content += 'set object rectangle from screen 0,0 to screen 1.0,0.45 behind fc rgb "#ffcccc"\n'
-        g2h_block = False
+        two2one_block = False
 
-    if not all(new_files[:2]):
-        content += 'set label "{/=30 No new guest-to-host results found}" at screen 0.5, screen 0.27 center\n'
+    if not new_files[0]:
+        content += 'set label "{/=30 No new Client 2 to Client 1 results found}" at screen 0.5, screen 0.27 center\n'
 
-    if not all(old_files[:2]):
-        content += 'set label "{/=30 No old guest-to-host results found}" at screen 0.5, screen 0.23 center\n'
+    if not old_files[0]:
+        content += 'set label "{/=30 No old Client 2 to Client 1 results found}" at screen 0.5, screen 0.23 center\n'
 
-    if not g2h_block:
+    if not two2one_block:
         content += '\n'
 
     content += '\nset multiplot\n'
-    if h2g_block:
-        dir_title = 'Host to Guest'
+    if one2two_block:
+        dir_title = 'Client 1 to Client 2'
         content += 'set origin 0.0,0.45\n'
         content += iperf_plot_block(data_unit, dir_title, old_files[0], new_files[0])
         content += '\nset origin 0.495,0.45\n'
         content += mpstat_plot_block(data_unit, dir_title, old_files[1], new_files[1])
 
-    if g2h_block:
-        dir_title = 'Guest to Host'
+    if two2one_block:
+        dir_title = 'Client 2 to Client 1'
         content += '\nset origin 0.0,0.0\n'
         content += iperf_plot_block(data_unit, dir_title, old_files[2], new_files[2])
         content += '\nset origin 0.495,0.0\n'
