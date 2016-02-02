@@ -52,6 +52,10 @@ streams = [1, 4]
 # The value MUST be one of 3: ['TCP'] | ['UDP'] | ['TCP', 'UDP']
 protocols = ['TCP', 'UDP']
 
+# The desired TCP window size. [str or None].
+# Set to None for default. Example: '1M'.
+tcp_win_size = None
+
 # Remote access method path: 'ssh' (for Linux), 'winexe' (for Windows),
 # or 'local' (to run on one of the clients). [str]
 # Note: for ssh access, an ssh key is required! The key needs to be unencrypted.

@@ -43,6 +43,7 @@ These options are:
 * `run_duration`: [int] The duration of a single run, in seconds. Must be at least 20, preferable at least 120. (Example: `300`)
 * `streams`: [iterable] The desired number of streams to test. (Example: `[1, 4]`)
 * `protocols`: [iterable] The desired protocol(s). The value MUST be one of 3 possibilities: `['TCP']` | `['UDP']` | `['TCP', 'UDP']`.
+* `tcp_win_size`: [str or None] The desired TCP window size. Set to **None** for default. (Example: `'1M'`)
 * `access_method_cl[1|2]`: [string] The access method path: `'ssh'` for Linux, `'winexe'` for Windows, or `'local'`, if the client is the local machine (the command, or full path to it).
 * `ssh_port_cl[1|2]`: [string] SSH port on the client (needed only if the access is by SSH).
 * `creds`: [string] A path to the credentials file. (Example: `'creds.dat'`)

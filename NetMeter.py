@@ -223,6 +223,13 @@ def yes_and_no(y, n):
         return 0
 
 
+def gen_tcp_win_msg(tcpwin):
+    if tcpwin:
+        return ', w=' + str(tcpwin)
+    else:
+        return ''
+
+
 def dir_prep(d):
     if not isdir(d):
         try:
@@ -309,12 +316,13 @@ def place_images(direction, protocol, summary_img, image_list, print_unit,
 
 def gen_html(title, one2two_summary, two2one_summary, one2two_images, two2one_images, html_outname,
              protocol, streams, all_one2two_failed, all_two2one_failed, print_unit, localpart,
-             cl1_pretty_name, cl2_pretty_name):
+             cl1_pretty_name, cl2_pretty_name, tcpwin):
     if localpart:
         CPU_note = 'and CPU '
     else:
         CPU_note = ''
 
+    tcp_win_msg = gen_tcp_win_msg(tcpwin)
     content = (
                '<!doctype html>\n'
                '<html>\n'
@@ -391,7 +399,7 @@ def gen_html(title, one2two_summary, two2one_summary, one2two_images, two2one_im
                '<body>\n'
                '<div id="header">\n'
                )
-    content += ('    <h3>' + title + ' [' + protocol + ', ' + str(streams) + ' st.]</h3>\n'
+    content += ('    <h3>' + title + ' [' + protocol + ', ' + str(streams) + ' st.' + tcp_win_msg + ']</h3>\n'
                 '</div>\n'
                 '<div id="container">\n'
                )
@@ -623,7 +631,7 @@ def plot_iperf_data(passed, plot_type, net_dat_file):
 def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate,
              protocol, streams, print_unit, cl1_pretty_name, cl2_pretty_name,
              plot_type = 'singlesize', direction = 'one2two', finished = True,
-             server_fault = False, packet_size = 0.0):
+             server_fault = False, packet_size = 0.0, tcpwin = None):
     try:
         net_rate, rate_units, rate_factor = get_size_units_factor(net_rate, rate=True)
         rate_format = ''
@@ -678,6 +686,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate,
         y2_axis = ''
         rmargin = 'set rmargin 4.5\n'
 
+    tcp_win_msg = gen_tcp_win_msg(tcpwin)
     warning_message = ''
     if not finished:
         warning_message = 'set label "Warning:\\nTest failed to finish!\\nResults may not be accurate!" at screen 0.01, screen 0.96 tc rgb "red"\n'
@@ -691,7 +700,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate,
                'set terminal pngcairo nocrop enhanced size 1024,768 font "Verdana,15"\n'
                'set output "' + img_file + '"\n'
                '\n'
-               'set title "{/=20 ' + plot_title + '}\\n\\n{/=18 (' + plot_subtitle + ', ' + protocol + ', ' + str(streams) + ' st.)}"\n'
+               'set title "{/=20 ' + plot_title + '}\\n\\n{/=18 (' + plot_subtitle + ', ' + protocol + ', ' + str(streams) + ' st.' + tcp_win_msg + ')}"\n'
                + rate_format + warning_message +
                '\n'
                'set xlabel "' + x_title + '"\n'
@@ -712,8 +721,10 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate,
         outfile.write(content)
 
 
-def set_protocol_opts(protocol, client = True):
-    if protocol == 'TCP':
+def set_protocol_opts(protocol, tcpwin, client = True):
+    if protocol == 'TCP' and tcpwin:
+        return ['-w', str(tcpwin)]
+    elif protocol == 'TCP':
         return []
     elif protocol == 'UDP':
         if client:
@@ -736,9 +747,9 @@ def bend_max_size(size, protocol):
         return size
 
 
-def run_server(protocol, init_name, dir_time, conn):
+def run_server(protocol, init_name, dir_time, conn, tcpwin):
     iperf_args = ['-s', '-i', '10', '-y', 'C']
-    protocol_opts = set_protocol_opts(protocol, client = False)
+    protocol_opts = set_protocol_opts(protocol, tcpwin, client = False)
     iperf_args += protocol_opts
     conn_name = conn.getname()
     iperf_command, output = conn.get_command(iperf_args, init_name + '_iperf.dat', init_name + '_iperf.err')
@@ -749,7 +760,7 @@ def run_server(protocol, init_name, dir_time, conn):
 
 
 def run_client(server_addr, runtime, p_size, streams, init_name, dir_time,
-               protocol, conn, localpart):
+               protocol, conn, localpart, tcpwin):
     p_size = bend_max_size(p_size, protocol)
     repetitions, mod = divmod(runtime, 10)
     if not mod:
@@ -757,7 +768,7 @@ def run_client(server_addr, runtime, p_size, streams, init_name, dir_time,
 
     iperf_args =  ['-c', server_addr, '-t', str(runtime), '-l', str(p_size),
                    '-P', str(streams)]
-    protocol_opts = set_protocol_opts(protocol)
+    protocol_opts = set_protocol_opts(protocol, tcpwin)
     iperf_args += protocol_opts
     iperf_command, output = conn.get_command(iperf_args, init_name + '_iperf_client.out', init_name + '_iperf_client.err')
     source_name = conn.getname()
@@ -813,7 +824,7 @@ def stop_server(conn, dir_time):
 
 
 def run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime, p_sizes,
-              streams, timestamp, test_title, protocol, export_dir):
+              streams, timestamp, test_title, protocol, tcpwin, export_dir):
     series_time = str(timedelta(seconds = 2 * len(p_sizes) * (runtime + 30) + 20))
     print(time_header() + '\033[92mStarting ' + protocol + ' tests.\033[0m Expected run time: ' + series_time)
     top_dir_name = timestamp + '_' + protocol + '_' + str(streams) + '_st'
@@ -851,10 +862,10 @@ def run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime, p_sizes,
             combined_sumname = dir_time + '_' + direction + '_summary'
             try:
                 print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-                run_server(protocol, init_name, dir_time, server_conn)
+                run_server(protocol, init_name, dir_time, server_conn, tcpwin)
                 test_completed, repetitions = run_client(server_addr, runtime, p, streams,
                                                          init_name, dir_time, protocol,
-                                                         client_conn, localpart)
+                                                         client_conn, localpart, tcpwin)
                 stop_server(server_conn, dir_time)
                 print('Parsing results...')
                 if localpart:
@@ -886,7 +897,8 @@ def run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime, p_sizes,
                          mpstat_single_file, basename(init_name + '.png'),
                          tot_iperf_mean, protocol, streams, print_unit, cl1_pretty_name,
                          cl2_pretty_name, plot_type = 'singlesize', direction = direction,
-                         finished = test_completed, server_fault = server_fault, packet_size = p)
+                         finished = test_completed, server_fault = server_fault,
+                         packet_size = p, tcpwin = tcpwin)
                 print('Plotting...')
                 pr = Popen([gnuplot_bin, basename(init_name + '.plt')], cwd=dirname(dir_time))
                 pr.wait()
@@ -916,7 +928,8 @@ def run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime, p_sizes,
                      mpstat_ser_file, basename(combined_sumname + '.png'),
                      tot_iperf_mean, protocol, streams, print_unit, cl1_pretty_name,
                      cl2_pretty_name, plot_type = 'multisize', direction = direction,
-                     server_fault = np.array(iperf_tot)[:,0], packet_size = np.mean(p_sizes))
+                     server_fault = np.array(iperf_tot)[:,0], packet_size = np.mean(p_sizes),
+                     tcpwin = tcpwin)
             pr = Popen([gnuplot_bin, basename(combined_sumname + '.plt')], cwd=dirname(dir_time))
             pr.wait()
         elif direction == 'one2two':
@@ -930,25 +943,26 @@ def run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime, p_sizes,
              join(raw_data_subdir, common_filename + '_two2one_summary.png'),
              one2two_images, two2one_images, html_name, protocol, streams,
              all_one2two_failed, all_two2one_failed, print_unit, localpart,
-             cl1_pretty_name, cl2_pretty_name)
+             cl1_pretty_name, cl2_pretty_name, tcpwin)
 
 
 def run_tests_for_protocols(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip,
                             runtime, p_sizes, streams, timestamp, test_title,
-                            protocols, export_dir):
+                            protocols, tcpwin, export_dir):
     for p in protocols:
         run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime,
-                  p_sizes, streams, timestamp, test_title, p, export_dir)
+                  p_sizes, streams, timestamp, test_title, p, tcpwin,
+                  export_dir)
 
 
 def run_tests_for_streams(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip,
                           runtime, p_sizes, streams, timestamp, test_title,
-                          protocols, export_dir):
+                          protocols, tcpwin, export_dir):
     for s in streams:
         if str(s).isdigit():
             run_tests_for_protocols(cl1_conn, cl2_conn, cl1_test_ip,
                                     cl2_test_ip, runtime, p_sizes, s,
-                                    timestamp, test_title, protocols,
+                                    timestamp, test_title, protocols, tcpwin,
                                     export_dir)
         else:
             print('\033[91mERROR:\033[0m Can not test for ' + s +
@@ -973,7 +987,7 @@ if __name__ == "__main__":
     # Run tests
     run_tests_for_streams(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip,
                           run_duration, test_range, streams, rundate, title,
-                          protocols, export_dir)
+                          protocols, tcp_win_size, export_dir)
     # Shut down the clients if needed.
     # IF ONE OF THE CLIENTS IS LOCAL, IT WILL NOT SHUT DOWN.
     if shutdown:
