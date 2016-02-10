@@ -96,19 +96,17 @@ class Connect(object):
         self.conn_name = conn_name
         self.creds = creds
         self.verify_credsfile()
+        self.iperf_cmd = [iperf_bin]
         if self.conn_type == 'local':
-            self.iperf_cmd = [iperf_bin]
             self.stop_iperf = ['killall', '-9', basename(iperf_bin)]
         elif self.conn_type == 'ssh':
             self.auth = [access_method, '-i', self.key, '-p', str(ssh_port), '-l', self.username,
                          '-o', 'UserKnownHostsFile=/dev/null', '-o', 'StrictHostKeyChecking=no',
                          '-o', 'BatchMode=yes', '-o', 'LogLevel=ERROR', ip]
-            self.iperf_cmd = [iperf_bin]
             self.stop_iperf = ['killall', '-9', basename(iperf_bin)]
             self.shutdown_command = ['sudo', 'shutdown', '-h', 'now']
         elif self.conn_type == 'winexe':
             self.auth = [access_method, '-A',  self.creds, '//' + ip]
-            self.iperf_cmd = [iperf_bin]
             self.stop_iperf = ['taskkill /im ' + basename(iperf_bin) + ' /f']
             self.shutdown_command = ['shutdown /t 10 /s /f']
         else:
