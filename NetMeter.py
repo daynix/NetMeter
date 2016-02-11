@@ -860,8 +860,8 @@ def run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime, p_sizes,
             iperf_sumname = dir_time + '_' + direction + '_iperf_summary'
             mpstat_sumname = dir_time + '_' + direction + '_mpstat_summary'
             combined_sumname = dir_time + '_' + direction + '_summary'
+            print('++++++++++++++++++++++++++++++++++++++++++++++++++')
             try:
-                print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
                 run_server(protocol, init_name, dir_time, server_conn, tcpwin)
                 test_completed, repetitions = run_client(server_addr, runtime, p, streams,
                                                          init_name, dir_time, protocol,
@@ -883,41 +883,48 @@ def run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime, p_sizes,
                 elif server_fault == 'too_many':
                     print('\033[93mWARNING:\033[0m The server received more connections than expected.')
 
-                # Get the "humanly readable" rate and its units.
-                # This is just to put in the output data file, not for any calculations.
-                # The units will be constant, and will be fixed after the first measurement.
-                try:
-                    hr_net_rate = tot_iperf_mean / float(rate_factor)
-                except:
-                    _, rate_units, rate_factor = get_size_units_factor(tot_iperf_mean, rate=True)
-                    hr_net_rate = tot_iperf_mean / float(rate_factor)
-
-                export_single_data(iperf_array, init_name + '_iperf_processed.dat')
-                write_gp(init_name + '.plt', basename(init_name + '_iperf_processed.dat'),
-                         mpstat_single_file, basename(init_name + '.png'),
-                         tot_iperf_mean, protocol, streams, print_unit, cl1_pretty_name,
-                         cl2_pretty_name, plot_type = 'singlesize', direction = direction,
-                         finished = test_completed, server_fault = server_fault,
-                         packet_size = p, tcpwin = tcpwin)
-                print('Plotting...')
-                pr = Popen([gnuplot_bin, basename(init_name + '.plt')], cwd=dirname(dir_time))
-                pr.wait()
-                image_list.append(join(raw_data_subdir, basename(init_name + '.png')))
-                iperf_tot.append([ yes_and_no(test_completed, server_fault), p, tot_iperf_mean,
-                                  tot_iperf_stdev, hr_net_rate ])
-                print('============================================================')
             except ValueError as err:
                 print(time_header() + '\033[91mERROR:\033[0m ' + err.args[0] + ' Skipping test...')
                 image_list.append(get_round_size_name(p, gap = True))
                 iperf_tot.append([ -1, p, 0, 0, 0 ])
-                print('============================================================')
+                print('==================================================')
+                continue
+
+            # Get the "humanly readable" rate and its units.
+            # This is just to put in the output data file, not for any calculations.
+            # The units will be constant, and will be fixed after the first measurement.
+            try:
+                hr_net_rate = tot_iperf_mean / float(rate_factor)
+            except:
+                _, rate_units, rate_factor = get_size_units_factor(tot_iperf_mean, rate=True)
+                hr_net_rate = tot_iperf_mean / float(rate_factor)
+
+            export_single_data(iperf_array, init_name + '_iperf_processed.dat')
+            write_gp(init_name + '.plt', basename(init_name + '_iperf_processed.dat'),
+                     mpstat_single_file, basename(init_name + '.png'),
+                     tot_iperf_mean, protocol, streams, print_unit, cl1_pretty_name,
+                     cl2_pretty_name, plot_type = 'singlesize', direction = direction,
+                     finished = test_completed, server_fault = server_fault,
+                     packet_size = p, tcpwin = tcpwin)
+            print('Plotting...')
+            pr = Popen([gnuplot_bin, basename(init_name + '.plt')],
+                       cwd = dirname(dir_time))
+            pr.wait()
+            image_list.append(join(raw_data_subdir, basename(init_name + '.png')))
+            iperf_tot.append([ yes_and_no(test_completed, server_fault), p,
+                              tot_iperf_mean, tot_iperf_stdev, hr_net_rate ])
+            print('==================================================')
 
         if tot_iperf_mean > 0.0:
             print(plot_message)
             np.savetxt(iperf_sumname + '.dat', iperf_tot, fmt='%g',
-                       header= 'TestOK ' + print_unit + 'Size(B) BW(b/s) Stdev(b/s) BW(' + rate_units + ')')
+                       header= ('TestOK ' + print_unit +
+                                'Size(B) BW(b/s) Stdev(b/s) BW(' +
+                                rate_units + ')'))
+
             if localpart:
-                np.savetxt(mpstat_sumname + '.dat', mpstat_tot, fmt='%g', header= print_unit + 'Size(B) Frac Stdev')
+                np.savetxt(mpstat_sumname + '.dat', mpstat_tot, fmt = '%g',
+                           header = print_unit + 'Size(B) Frac Stdev')
                 mpstat_ser_file = basename(mpstat_sumname + '.dat')
             else:
                 mpstat_ser_file = None
