@@ -672,7 +672,7 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate,
     if direction == 'one2two':
         plot_subtitle = cl1_pretty_name + ' to ' + cl2_pretty_name
     else:
-        plot_subtitle = cl1_pretty_name + ' to ' + cl2_pretty_name
+        plot_subtitle = cl2_pretty_name + ' to ' + cl1_pretty_name
 
     if proc_dat_file:
         proc_plot = ('     "' + proc_dat_file + '" using 1:($2-$3):($2+$3) with filledcurves lc rgb "red" axes x1y2 notitle, \\\n'
