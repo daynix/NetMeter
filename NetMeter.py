@@ -228,15 +228,17 @@ def gen_tcp_win_msg(tcpwin):
         return ''
 
 
-def dir_prep(d):
-    if not isdir(d):
+def dir_prep(dir, subdir):
+    data_path = join(dir, subdir)
+    if not isdir(data_path):
         try:
-            makedirs(d)
+            makedirs(data_path)
         except:
-            print('The output directory (' + d + ') could not be created. Exiting.')
+            print('The output directory (' + data_path +
+                  ') can not be created. Exiting.')
             sys.exit(1)
 
-    print('The output directory is set to: \033[93m' + d + '\033[0m')
+    print('The output directory is set to: \033[93m' + dir + '\033[0m')
 
 
 def cmd_print(text, conn_name, dir_time):
@@ -829,7 +831,7 @@ def run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime, p_sizes,
     common_filename = protocol + '_' + str(streams) + '_st_' + timestamp
     print_unit = 'Buffer' if protocol == 'TCP' else 'Datagram'
     raw_data_subdir="raw-data"
-    dir_prep(join(export_dir, top_dir_name, raw_data_subdir))
+    dir_prep(join(export_dir, top_dir_name), raw_data_subdir)
     dir_time = join(export_dir, top_dir_name, raw_data_subdir, common_filename)
     html_name = join(export_dir, top_dir_name, common_filename + ".html")
     one2two_images = []
