@@ -953,28 +953,36 @@ def run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime, p_sizes,
              cl1_pretty_name, cl2_pretty_name, tcpwin)
 
 
-def run_tests_for_protocols(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip,
-                            runtime, p_sizes, streams, timestamp, test_title,
-                            protocols, tcpwin, export_dir):
-    for p in protocols:
-        run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime,
-                  p_sizes, streams, timestamp, test_title, p, tcpwin,
-                  export_dir)
+class Multitest(object):
+    def __init__(self, cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime,
+                 p_sizes, timestamp, test_title, tcpwin, export_dir):
+        self.cl1_conn    = cl1_conn
+        self.cl2_conn    = cl2_conn
+        self.cl1_test_ip = cl1_test_ip
+        self.cl2_test_ip = cl2_test_ip
+        self.runtime     = runtime
+        self.p_sizes     = p_sizes
+        self.timestamp   = timestamp
+        self.test_title  = test_title
+        self.tcpwin      = tcpwin
+        self.export_dir  = export_dir
 
+    def run_tests_for_protocols(self, streams, proto_list):
+        for p in proto_list:
+            run_tests(self.cl1_conn, self.cl2_conn, self.cl1_test_ip,
+                      self.cl2_test_ip, self.runtime, self.p_sizes, streams,
+                      self.timestamp, self.test_title, p, self.tcpwin,
+                      self.export_dir)
 
-def run_tests_for_streams(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip,
-                          runtime, p_sizes, streams, timestamp, test_title,
-                          protocols, tcpwin, export_dir):
-    for s in streams:
-        if str(s).isdigit():
-            run_tests_for_protocols(cl1_conn, cl2_conn, cl1_test_ip,
-                                    cl2_test_ip, runtime, p_sizes, s,
-                                    timestamp, test_title, protocols, tcpwin,
-                                    export_dir)
-        else:
-            print('\033[91mERROR:\033[0m Can not test for ' + s +
-                  ' streams. Please verify that the number of streams is a positive integer.')
-            sys.exit(1)
+    def run_tests_for_streams(self, stream_list, proto_list):
+        for s in stream_list:
+            if str(s).isdigit():
+                self.run_tests_for_protocols(s, proto_list)
+            else:
+                print('\033[91mERROR:\033[0m Can not test for ' + s +
+                      ' streams. Please verify that the number of streams'
+                      ' is a positive integer.')
+                sys.exit(1)
 
 
 if __name__ == "__main__":
@@ -992,9 +1000,10 @@ if __name__ == "__main__":
         print(time_header() + '\033[92mExpected total run time: \033[0m' + '\033[91m' + total_time + '\033[0m')
 
     # Run tests
-    run_tests_for_streams(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip,
-                          run_duration, test_range, streams, rundate, title,
-                          protocols, tcp_win_size, export_dir)
+    testinsts = Multitest(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip,
+                          run_duration, test_range, rundate, title,
+                          tcp_win_size, export_dir)
+    testinsts.run_tests_for_streams(streams, protocols)
     # Shut down the clients if needed.
     # IF ONE OF THE CLIENTS IS LOCAL, IT WILL NOT SHUT DOWN.
     if shutdown:
