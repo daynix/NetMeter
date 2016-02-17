@@ -292,7 +292,7 @@ def main():
     count = 0
     for (o,n) in zip(olddirs,newdirs):
         count += 1
-        out_basename = join(outdir, rundate + '_comp_' + str(count))
+        out_basename = join(outdir, rundate + '_comp_' + format(count, '04d'))
         write_comp_gp(o, n, out_basename)
         p = Popen([gnuplot_path, out_basename + '.plt'])
         p.wait()
