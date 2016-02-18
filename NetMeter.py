@@ -209,6 +209,10 @@ def time_header():
     return datetime.now().strftime('[ %H:%M:%S ] ')
 
 
+def tprint(str):
+    print(time_header() + str)
+
+
 def interrupt_exit(signal, frame):
     print('\n\033[91mInterrupted by user. Exiting.\033[0m')
     sys.exit(1)
@@ -773,7 +777,7 @@ def run_client(server_addr, runtime, p_size, streams, init_name, dir_time,
     iperf_command, output = conn.get_command(iperf_args, init_name + '_iperf_client.out', init_name + '_iperf_client.err')
     source_name = conn.getname()
     size_name = get_round_size_name(p_size)
-    print(time_header() + 'Running ' + size_name + ' test from ' + source_name + '. (Duration: '
+    tprint('Running ' + size_name + ' test from ' + source_name + '. (Duration: '
           + str(timedelta(seconds = repetitions * 10 + mod)) + ')')
     conn_name = conn.getname()
     cmd_print(iperf_command, conn_name, dir_time)
@@ -789,7 +793,7 @@ def run_client(server_addr, runtime, p_size, streams, init_name, dir_time,
     while iperf_proc.poll() == None:
         # iperf_proc.poll() may be "False" or "None". Here we want "None" specifically, thus "not iperf_proc.poll()" won't work.
         if waitcount:
-            print(time_header() + '\033[93mThe Iperf test is not over yet.\033[0m Waiting for 10 more seconds...')
+            tprint('\033[93mThe Iperf test is not over yet.\033[0m Waiting for 10 more seconds...')
             sleep(10)
             waitcount -= 1
         else:
@@ -797,11 +801,11 @@ def run_client(server_addr, runtime, p_size, streams, init_name, dir_time,
             sleep(2)
 
     if not iperf_proc.poll():
-        print(time_header() + '\033[92mThe ' + size_name + ' test finished.\033[0m Waiting for 10 seconds.')
+        tprint('\033[92mThe ' + size_name + ' test finished.\033[0m Waiting for 10 seconds.')
         sleep(10)
         return True, repetitions
     else:
-        print(time_header() + '\033[91mThe Iperf test failed to finish.\033[0m Skipping in 10 seconds.')
+        tprint('\033[91mThe Iperf test failed to finish.\033[0m Skipping in 10 seconds.')
         sleep(10)
         return False, repetitions
 
@@ -826,7 +830,7 @@ def stop_server(conn, dir_time):
 def run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime, p_sizes,
               streams, timestamp, test_title, protocol, tcpwin, export_dir):
     series_time = str(timedelta(seconds = 2 * len(p_sizes) * (runtime + 30) + 20))
-    print(time_header() + '\033[92mStarting ' + protocol + ' tests.\033[0m Expected run time: ' + series_time)
+    tprint('\033[92mStarting ' + protocol + ' tests.\033[0m Expected run time: ' + series_time)
     top_dir_name = timestamp + '_' + protocol + '_' + str(streams) + '_st'
     common_filename = protocol + '_' + str(streams) + '_st_' + timestamp
     print_unit = 'Buffer' if protocol == 'TCP' else 'Datagram'
@@ -884,7 +888,7 @@ def run_tests(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip, runtime, p_sizes,
                     print('\033[93mWARNING:\033[0m The server received more connections than expected.')
 
             except ValueError as err:
-                print(time_header() + '\033[91mERROR:\033[0m ' + err.args[0] + ' Skipping test...')
+                tprint('\033[91mERROR:\033[0m ' + err.args[0] + ' Skipping test...')
                 image_list.append(get_round_size_name(p, gap = True))
                 iperf_tot.append([ -1, p, 0, 0, 0 ])
                 print('==================================================')
@@ -995,9 +999,9 @@ if __name__ == "__main__":
     if (len(protocols) > 1) or (len(streams) > 1):
         total_time = str(timedelta(seconds = (2 * len(test_range) * (run_duration + 32) + 20) *
                          len(protocols) * len(streams)))
-        print(time_header() + '\033[92mStarting tests for protocols: ' + ', '.join(protocols) + '.\033[0m')
-        print(time_header() + '\033[92mUsing ' + ','.join(str(s) for s in streams) + ' stream(s).\033[0m')
-        print(time_header() + '\033[92mExpected total run time: \033[0m' + '\033[91m' + total_time + '\033[0m')
+        tprint('\033[92mStarting tests for protocols: ' + ', '.join(protocols) + '.\033[0m')
+        tprint('\033[92mUsing ' + ','.join(str(s) for s in streams) + ' stream(s).\033[0m')
+        tprint('\033[92mExpected total run time: \033[0m' + '\033[91m' + total_time + '\033[0m')
 
     # Run tests
     testinsts = Multitest(cl1_conn, cl2_conn, cl1_test_ip, cl2_test_ip,
