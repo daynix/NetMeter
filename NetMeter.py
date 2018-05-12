@@ -540,7 +540,7 @@ def get_iperf_data_single(iperf_out, protocol, streams, repetitions):
             server_fault = 'too_many'
 
     ### End connection ammount check
-    iperf_data = iperf_data[:,[0,2]].reshape((num_conn, iperf_data.shape[0]/num_conn, 2))
+    iperf_data = iperf_data[:,[0,2]].reshape((num_conn, iperf_data.shape[0]//num_conn, 2))
     iperf_data = np.ma.masked_array(iperf_data, np.isnan(iperf_data))
     mean_times = np.mean(iperf_data[:,:,0], axis=0)
     iperf_stdev = np.std(iperf_data[:,:,1], axis=0) * np.sqrt(num_conn)
