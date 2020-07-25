@@ -95,6 +95,8 @@ class Connect(object):
         self.conn_type = basename(access_method)
         self.conn_name = conn_name
         self.creds = creds
+        self.ip = ip
+        self.ssh_port = ssh_port
         self.verify_credsfile()
         self.iperf_cmd = [iperf_bin]
         if self.conn_type == 'local':
@@ -192,7 +194,7 @@ class Connect(object):
                                    '"NetMeter_test-' + rundate + '"'])
                         p.wait()
                         p = Popen(['ssh-copy-id', '-i', self.key + '.pub', '-p',
-                                   str(ssh_port), self.username + '@' + ip])
+                                   str(self.ssh_port), self.username + '@' + self.ip])
                         p.wait()
                         print('OK')
                         break
