@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #
 # Copyright (c) 2015, Daynix Computing LTD (www.daynix.com)
 # All rights reserved.
