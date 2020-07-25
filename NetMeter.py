@@ -568,9 +568,9 @@ def get_mpstat_data_single(mpstat_out):
 
                 if not time_interval:
                     try:
-+                        time = datetime.strptime(tmp_lst[0] + tmp_lst[1], '%I:%M:%S%p')
-+                    except ValueError:
-+                        time = datetime.strptime(tmp_lst[0], '%H:%M:%S')
+                        time = datetime.strptime(tmp_lst[0] + tmp_lst[1], '%I:%M:%S%p')
+                    except ValueError:
+                        time = datetime.strptime(tmp_lst[0], '%H:%M:%S')
 
                     if not mpstat_data:
                         first_time = time
