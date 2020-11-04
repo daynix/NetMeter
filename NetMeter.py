@@ -187,7 +187,7 @@ class Connect(object):
                 print('\033[93mSSH key file not found.\033[0m')
                 create_key_trys = 4
                 while create_key_trys:
-                    ns = input('Create the keypair "' + self.key + '*" and transfer it to ' + self.conn_name + '? (Y/n) ')
+                    ns = input('Create the keypair "' + self.key + '{,.pub}" and transfer it to ' + self.conn_name + '? (Y/n) ')
                     if ns in ['', 'Y', 'y']:
                         p = Popen(['ssh-keygen', '-t', 'rsa', '-b', '4096', '-f',
                                    self.key, '-N', '', '-C',
