@@ -532,10 +532,12 @@ def get_iperf_data_single(iperf_out, protocol, streams, repetitions):
         # Get the first lines to remove
         first_for_removal = remove_before_lines - amount_lines_to_remove
         # Get the ranges of lines to remove
-        lines_to_remove = np.array([
-                                    np.arange(first_for_removal[i],remove_before_lines[i])
-                                    for i in np.arange(first_for_removal.size)
-                                   ]).flatten()
+        lines_to_remove = np.hstack(
+                                    np.array([
+                                              np.arange(first_for_removal[i],remove_before_lines[i])
+                                              for i in np.arange(first_for_removal.size)
+                                             ], dtype=object)
+                                   ).astype(int)
         # Remove the extra lines
         iperf_data = np.delete(iperf_data, lines_to_remove, axis=0)
         if not server_fault:
