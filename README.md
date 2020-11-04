@@ -17,11 +17,13 @@ In order to run the NetMeter one needs:
     * Numpy (for Python 3)
     * Winexe
     * Iperf 2 (_IMPORTANT_: Version 2.0.8 or later, _i.e._ the **latest** version!)
+    * sysstat
     * gnuplot
 * On the guest:
     * Linux guests:
         * SSH server.
         * Iperf 2 (**The latest version as well!**)
+        * sysstat
         * Disabled firewall, or port 5001 opened.
         * `sudo` access for the testing user, preferably passwordless, at least for shutdown.
     * Windows guests:
