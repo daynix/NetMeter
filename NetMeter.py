@@ -702,9 +702,9 @@ def write_gp(gp_outname, net_dat_file, proc_dat_file, img_file, net_rate,
     warning_message = ''
     if not finished:
         warning_message = 'set label "Warning:\\nTest failed to finish!\\nResults may not be accurate!" at screen 0.01, screen 0.96 tc rgb "red"\n'
-    elif server_fault == 'too_few':
+    elif isinstance(server_fault, str) and server_fault == 'too_few':
         warning_message = 'set label "Warning:\\nToo few connections!\\nResults may not be accurate!" at screen 0.01, screen 0.96 tc rgb "red"\n'
-    elif server_fault == 'too_many':
+    elif isinstance(server_fault, str) and server_fault == 'too_many':
         warning_message = 'set label "Warning:\\nToo many connections!\\nResults may not be accurate!" at screen 0.01, screen 0.96 tc rgb "red"\n'
 
     plot_net_data = plot_iperf_data(server_fault, plot_type, net_dat_file)
